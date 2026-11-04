@@ -1,0 +1,2579 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>DropLink — Direct File Sharing</title>
+
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link
+    href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Fraunces:opsz,wght@9..144,600&display=swap"
+    rel="stylesheet">
+  <script src="https://cdn.jsdelivr.net/npm/qrcodejs@1.0.0/qrcode.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script>
+    const SUPABASE_URL = "https://ioldowzsooouvxxczjcg.supabase.co";
+    const SUPABASE_KEY = "sb_publishable_h55vK1csxwr7L1JtfXVAIQ_tIEB0PCH";
+
+    window.droplinkSupabase = window.supabase.createClient(
+      SUPABASE_URL,
+      SUPABASE_KEY
+    );
+  </script>
+
+  <style>
+    /* ==================================================================
+       Design tokens
+       ================================================================== */
+    :root {
+      --bg: #0a0f14;
+      --surface: rgba(23, 32, 41, 0.72);
+      --surface-solid: #151d25;
+      --line: rgba(183, 212, 204, 0.14);
+      --line-strong: rgba(183, 212, 204, 0.3);
+      --ink: #f1f5f1;
+      --muted: #a9b7b7;
+      --accent: #b9e976;
+      --accent-soft: rgba(185, 233, 118, 0.14);
+      --accent-ink: #142019;
+      --danger: #ff9d9d;
+      --warning: #ffd08a;
+      --radius-xl: 26px;
+      --radius-lg: 18px;
+      --radius-md: 14px;
+      --radius-sm: 11px;
+      --shadow: 0 24px 60px rgba(0, 0, 0, 0.35);
+      --font: "DM Sans", system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+      --font-display: "Fraunces", Georgia, "Times New Roman", serif;
+    }
+
+    /* ==================================================================
+       Base
+       ================================================================== */
+    *, *::before, *::after { box-sizing: border-box; }
+
+    html { -webkit-text-size-adjust: 100%; }
+
+    body {
+      margin: 0;
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      font-family: var(--font);
+      font-size: 16px;
+      line-height: 1.55;
+      color: var(--ink);
+      background: var(--bg);
+      -webkit-font-smoothing: antialiased;
+      -moz-osx-font-smoothing: grayscale;
+    }
+
+    h1, h2, h3, p { margin: 0; }
+
+    button, input { font-family: inherit; font-size: inherit; color: inherit; }
+
+    a { color: inherit; }
+
+    [hidden] { display: none !important; }
+
+    .sr-only {
+      position: absolute;
+      width: 1px; height: 1px;
+      padding: 0; margin: -1px;
+      overflow: hidden;
+      clip: rect(0 0 0 0);
+      white-space: nowrap;
+      border: 0;
+    }
+
+    :focus-visible {
+      outline: 2px solid var(--accent);
+      outline-offset: 3px;
+    }
+
+    /* ==================================================================
+       Ambient background
+       ================================================================== */
+    .aurora {
+      position: fixed;
+      inset: 0;
+      z-index: 0;
+      overflow: hidden;
+      pointer-events: none;
+    }
+    .aurora span {
+      position: absolute;
+      display: block;
+      border-radius: 50%;
+      filter: blur(100px);
+      opacity: 0.42;
+    }
+    .aurora span:nth-child(1) {
+      width: 58vmax; height: 58vmax;
+      top: -26vmax; right: -18vmax;
+      background: radial-gradient(circle, rgba(131, 189, 128, 0.75), transparent 68%);
+    }
+    .aurora span:nth-child(2) {
+      width: 52vmax; height: 52vmax;
+      bottom: -28vmax; left: -20vmax;
+      background: radial-gradient(circle, rgba(64, 118, 130, 0.7), transparent 68%);
+    }
+
+    .app {
+      position: relative;
+      z-index: 1;
+      display: flex;
+      flex-direction: column;
+      min-height: 100vh;
+    }
+
+    .container {
+      width: 100%;
+      max-width: 1080px;
+      margin: 0 auto;
+      padding: 0 22px;
+    }
+
+    /* ==================================================================
+       Header
+       ================================================================== */
+    .site-header {
+      position: sticky;
+      top: 0;
+      z-index: 20;
+      background: rgba(10, 15, 20, 0.72);
+      border-bottom: 1px solid var(--line);
+      backdrop-filter: blur(16px);
+      -webkit-backdrop-filter: blur(16px);
+    }
+
+    .header-inner {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 16px;
+      height: 74px;
+    }
+
+    .brand {
+      display: inline-flex;
+      align-items: center;
+      gap: 12px;
+      padding: 6px 8px 6px 6px;
+      border: 0;
+      border-radius: var(--radius-md);
+      background: none;
+      cursor: pointer;
+      transition: background 0.18s ease;
+    }
+    .brand:hover { background: rgba(255, 255, 255, 0.05); }
+
+    .brand-mark {
+      display: grid;
+      place-items: center;
+      width: 40px; height: 40px;
+      border-radius: 12px;
+      background: var(--accent);
+      color: var(--accent-ink);
+      box-shadow: 0 6px 18px rgba(185, 233, 118, 0.25);
+    }
+
+    .brand-name {
+      font-size: 21px;
+      font-weight: 700;
+      letter-spacing: -0.02em;
+    }
+
+    .header-actions {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+
+    .status-pill {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      padding: 7px 14px;
+      font-size: 13px;
+      color: var(--muted);
+      border: 1px solid var(--line);
+      border-radius: 999px;
+      background: rgba(255, 255, 255, 0.03);
+      transition: color 0.2s ease, border-color 0.2s ease;
+    }
+    .status-dot {
+      width: 8px; height: 8px;
+      border-radius: 50%;
+      background: #5d6b73;
+      transition: background 0.2s ease, box-shadow 0.2s ease;
+    }
+    .status-pill.is-online {
+      color: var(--ink);
+      border-color: rgba(185, 233, 118, 0.4);
+    }
+    .status-pill.is-online .status-dot {
+      background: var(--accent);
+      box-shadow: 0 0 0 4px rgba(185, 233, 118, 0.16);
+    }
+
+    /* ==================================================================
+       Buttons
+       ================================================================== */
+    .btn {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      padding: 11px 20px;
+      font-weight: 500;
+      line-height: 1.2;
+      border: 1px solid transparent;
+      border-radius: var(--radius-sm);
+      background: none;
+      cursor: pointer;
+      text-decoration: none;
+      white-space: nowrap;
+      transition: background 0.18s ease, border-color 0.18s ease,
+                  transform 0.18s ease, opacity 0.18s ease;
+    }
+    .btn:disabled { opacity: 0.45; cursor: not-allowed; }
+
+    .btn-primary {
+      background: var(--accent);
+      color: var(--accent-ink);
+      font-weight: 700;
+    }
+    .btn-primary:hover:not(:disabled) {
+      background: #cdf29a;
+      transform: translateY(-1px);
+    }
+
+    .btn-ghost {
+      background: rgba(255, 255, 255, 0.04);
+      border-color: var(--line);
+      color: var(--ink);
+    }
+    .btn-ghost:hover:not(:disabled) {
+      background: rgba(255, 255, 255, 0.09);
+      border-color: var(--line-strong);
+    }
+
+    .btn-sm { padding: 7px 14px; font-size: 14px; }
+    .btn-block { width: 100%; margin-top: 22px; }
+
+    /* ==================================================================
+       Cards & layout
+       ================================================================== */
+    .main {
+      flex: 1;
+      padding: 46px 0 60px;
+    }
+
+    .card {
+      background: var(--surface);
+      border: 1px solid var(--line);
+      border-radius: var(--radius-xl);
+      box-shadow: var(--shadow);
+      backdrop-filter: blur(18px);
+      -webkit-backdrop-filter: blur(18px);
+    }
+
+    .panel { padding: 26px; }
+
+    .view { animation: rise 0.36s ease both; }
+    @keyframes rise {
+      from { opacity: 0; transform: translateY(10px); }
+      to   { opacity: 1; transform: translateY(0); }
+    }
+
+    .back-btn { margin-bottom: 26px; }
+
+    .display {
+      font-family: var(--font-display);
+      font-weight: 600;
+      letter-spacing: -0.035em;
+      line-height: 1.08;
+      font-size: clamp(2rem, 4.4vw, 3rem);
+    }
+
+    .lede {
+      max-width: 620px;
+      margin-top: 16px;
+      color: var(--muted);
+      font-size: 17px;
+    }
+
+    .muted { color: var(--muted); }
+    .small { font-size: 14px; }
+
+    .eyebrow {
+      font-size: 12px;
+      font-weight: 700;
+      letter-spacing: 0.22em;
+      text-transform: uppercase;
+      color: var(--accent);
+      margin-bottom: 18px;
+    }
+
+    .section-head {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 16px;
+      margin-bottom: 14px;
+    }
+
+    .section-title {
+      font-size: 19px;
+      font-weight: 700;
+      letter-spacing: -0.01em;
+    }
+
+    .divider {
+      height: 1px;
+      margin: 26px 0;
+      background: var(--line);
+    }
+
+    .label {
+      display: block;
+      margin-bottom: 10px;
+      font-size: 14px;
+      font-weight: 600;
+      color: var(--ink);
+    }
+
+    /* ==================================================================
+       Dashboard
+       ================================================================== */
+    .hero { max-width: 720px; margin-bottom: 40px; }
+
+    .action-grid {
+      display: grid;
+      gap: 18px;
+      grid-template-columns: 1fr;
+    }
+    @media (min-width: 760px) {
+      .action-grid { grid-template-columns: 1fr 1fr; }
+    }
+
+    .action-card {
+      display: flex;
+      flex-direction: column;
+      align-items: flex-start;
+      padding: 30px;
+      text-align: left;
+      font-family: inherit;
+      color: inherit;
+      cursor: pointer;
+      transition: transform 0.22s ease, border-color 0.22s ease, background 0.22s ease;
+    }
+    .action-card:hover {
+      transform: translateY(-4px);
+      border-color: rgba(185, 233, 118, 0.45);
+      background: rgba(30, 42, 52, 0.85);
+    }
+
+    .icon-badge {
+      display: grid;
+      place-items: center;
+      width: 52px; height: 52px;
+      margin-bottom: 26px;
+      border-radius: 16px;
+      border: 1px solid var(--line-strong);
+      color: var(--ink);
+    }
+    .icon-badge.is-solid {
+      background: var(--accent);
+      border-color: transparent;
+      color: var(--accent-ink);
+    }
+
+    .action-card h2 {
+      font-size: 23px;
+      font-weight: 700;
+      letter-spacing: -0.02em;
+      margin-bottom: 8px;
+    }
+
+    .action-card p {
+      color: var(--muted);
+      font-size: 15.5px;
+      line-height: 1.6;
+    }
+
+    .card-cta {
+      display: inline-flex;
+      align-items: center;
+      gap: 7px;
+      margin-top: 26px;
+      font-size: 15px;
+      font-weight: 600;
+      color: var(--accent);
+    }
+    .card-cta svg { transition: transform 0.22s ease; }
+    .action-card:hover .card-cta svg { transform: translateX(4px); }
+
+    .how-panel {
+      margin-top: 18px;
+      padding: 26px 28px;
+    }
+    .how-panel h2 { font-size: 19px; font-weight: 700; margin-bottom: 18px; }
+
+    .steps {
+      display: grid;
+      gap: 16px;
+      grid-template-columns: 1fr;
+    }
+    @media (min-width: 760px) {
+      .steps { grid-template-columns: repeat(3, 1fr); gap: 22px; }
+    }
+    .step { display: flex; gap: 12px; align-items: flex-start; }
+    .step-num {
+      flex: 0 0 auto;
+      display: grid;
+      place-items: center;
+      width: 26px; height: 26px;
+      border-radius: 50%;
+      background: var(--accent-soft);
+      color: var(--accent);
+      font-size: 13px;
+      font-weight: 700;
+    }
+    .step p { color: var(--muted); font-size: 14.5px; line-height: 1.55; }
+
+    /* ==================================================================
+       Drop zone
+       ================================================================== */
+    .drop-zone {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 4px;
+      padding: 38px 22px;
+      text-align: center;
+      border: 2px dashed var(--line-strong);
+      border-radius: var(--radius-lg);
+      cursor: pointer;
+      transition: border-color 0.2s ease, background 0.2s ease;
+    }
+    .drop-zone:hover,
+    .drop-zone.is-dragging {
+      border-color: var(--accent);
+      background: rgba(185, 233, 118, 0.07);
+    }
+
+    .drop-icon {
+      display: grid;
+      place-items: center;
+      width: 52px; height: 52px;
+      margin-bottom: 12px;
+      border-radius: 50%;
+      background: rgba(255, 255, 255, 0.05);
+      color: var(--accent);
+    }
+    .drop-title { font-weight: 700; font-size: 17px; }
+
+    /* ==================================================================
+       File rows
+       ================================================================== */
+    .list {
+      border: 1px solid var(--line);
+      border-radius: var(--radius-md);
+      padding: 0 16px;
+    }
+
+    .file-row {
+      display: flex;
+      align-items: center;
+      gap: 14px;
+      padding: 14px 0;
+    }
+    .file-row + .file-row { border-top: 1px solid var(--line); }
+
+    .file-icon {
+      flex: 0 0 auto;
+      display: grid;
+      place-items: center;
+      width: 38px; height: 38px;
+      border-radius: 11px;
+      background: rgba(255, 255, 255, 0.05);
+      color: var(--accent);
+      font-size: 17px;
+    }
+
+    .file-info { flex: 1 1 auto; min-width: 0; }
+
+    .file-name {
+      font-weight: 600;
+      font-size: 15px;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+    .file-meta { color: var(--muted); font-size: 13.5px; }
+
+    /* ==================================================================
+       Pairing panel
+       ================================================================== */
+    .pair-grid {
+      display: flex;
+      flex-direction: column;
+      gap: 26px;
+      align-items: flex-start;
+    }
+    @media (min-width: 620px) {
+      .pair-grid { flex-direction: row; }
+      .pair-info { flex: 1 1 auto; }
+    }
+
+    .qr-box {
+      flex: 0 0 auto;
+      display: grid;
+      place-items: center;
+      width: 176px; height: 176px;
+      padding: 12px;
+      border-radius: var(--radius-lg);
+      background: #ffffff;
+      color: #46525a;
+      font-size: 12px;
+      text-align: center;
+    }
+    .qr-box img,
+    .qr-box canvas { display: block; max-width: 100%; height: auto; margin: 0 auto; }
+
+    .room-code {
+      font-family: var(--font-display);
+      font-size: clamp(2rem, 7vw, 2.9rem);
+      letter-spacing: 0.16em;
+      font-variant-numeric: tabular-nums;
+      color: var(--accent);
+      line-height: 1.1;
+      word-break: break-all;
+    }
+
+    .btn-row {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px;
+      margin-top: 16px;
+    }
+
+    .status-line {
+      margin-top: 18px;
+      font-size: 15px;
+      color: var(--muted);
+    }
+
+    /* ==================================================================
+       Progress
+       ================================================================== */
+    .current-file {
+      margin-bottom: 14px;
+      font-weight: 600;
+      font-size: 15px;
+      word-break: break-word;
+    }
+
+    .progress-track {
+      height: 8px;
+      border-radius: 999px;
+      background: rgba(255, 255, 255, 0.09);
+      overflow: hidden;
+    }
+
+    .progress-fill {
+      width: 0%;
+      height: 100%;
+      border-radius: 999px;
+      background: linear-gradient(90deg, #8dbca5, var(--accent));
+      transition: width 0.14s linear;
+    }
+
+    .metrics {
+      margin-top: 12px;
+      font-size: 13.5px;
+      color: var(--muted);
+      font-variant-numeric: tabular-nums;
+    }
+
+    /* ==================================================================
+       Code input
+       ================================================================== */
+    .code-inputs {
+      display: grid;
+      grid-template-columns: repeat(6, 1fr);
+      gap: 10px;
+      margin-bottom: 22px;
+    }
+
+    .code-digit {
+      width: 100%;
+      height: 60px;
+      padding: 0;
+      text-align: center;
+      font-size: clamp(20px, 5vw, 26px);
+      font-weight: 700;
+      font-variant-numeric: tabular-nums;
+      color: var(--ink);
+      background: rgba(0, 0, 0, 0.28);
+      border: 1px solid var(--line-strong);
+      border-radius: var(--radius-md);
+      caret-color: var(--accent);
+      transition: border-color 0.18s ease, box-shadow 0.18s ease, background 0.18s ease;
+    }
+    .code-digit:focus {
+      outline: none;
+      border-color: var(--accent);
+      background: rgba(0, 0, 0, 0.42);
+      box-shadow: 0 0 0 4px rgba(185, 233, 118, 0.14);
+    }
+
+    .note {
+      padding: 14px 16px;
+      margin-bottom: 24px;
+      font-size: 14px;
+      color: var(--muted);
+      background: rgba(255, 255, 255, 0.04);
+      border: 1px solid var(--line);
+      border-radius: var(--radius-md);
+    }
+
+    /* ==================================================================
+       History
+       ================================================================== */
+    .history-row {
+      display: flex;
+      align-items: center;
+      gap: 14px;
+      padding: 16px 0;
+    }
+    .history-row + .history-row { border-top: 1px solid var(--line); }
+
+    .history-badge {
+      flex: 0 0 auto;
+      display: grid;
+      place-items: center;
+      width: 38px; height: 38px;
+      border-radius: 11px;
+      font-size: 16px;
+      font-weight: 700;
+    }
+    .history-badge.is-success { background: rgba(185, 233, 118, 0.14); color: var(--accent); }
+    .history-badge.is-warning { background: rgba(255, 208, 138, 0.14); color: var(--warning); }
+    .history-badge.is-error   { background: rgba(255, 157, 157, 0.14); color: var(--danger); }
+
+    .pill {
+      flex: 0 0 auto;
+      padding: 4px 12px;
+      font-size: 12.5px;
+      font-weight: 600;
+      border-radius: 999px;
+      white-space: nowrap;
+    }
+    .pill.is-success { background: rgba(185, 233, 118, 0.14); color: var(--accent); }
+    .pill.is-warning { background: rgba(255, 208, 138, 0.14); color: var(--warning); }
+    .pill.is-error   { background: rgba(255, 157, 157, 0.14); color: var(--danger); }
+
+    .empty-state {
+      padding: 44px 16px;
+      text-align: center;
+      color: var(--muted);
+    }
+
+    /* ==================================================================
+       Footer
+       ================================================================== */
+    .site-footer {
+      border-top: 1px solid var(--line);
+      padding: 22px 0;
+      font-size: 14px;
+      color: var(--muted);
+    }
+
+    /* ==================================================================
+       Toasts
+       ================================================================== */
+    .toast-stack {
+      position: fixed;
+      z-index: 60;
+      left: 18px;
+      right: 18px;
+      bottom: 18px;
+      display: flex;
+      flex-direction: column;
+      align-items: stretch;
+      gap: 10px;
+      pointer-events: none;
+    }
+    @media (min-width: 640px) {
+      .toast-stack { left: auto; width: 380px; }
+    }
+
+    .toast {
+      pointer-events: auto;
+      padding: 14px 18px;
+      font-size: 14px;
+      line-height: 1.45;
+      background: rgba(23, 32, 41, 0.96);
+      border: 1px solid var(--line-strong);
+      border-left: 3px solid var(--accent);
+      border-radius: var(--radius-md);
+      box-shadow: var(--shadow);
+      animation: toast-in 0.26s ease both;
+    }
+    .toast.is-leaving { animation: toast-out 0.24s ease both; }
+    .toast-error   { border-left-color: var(--danger); }
+    .toast-success { border-left-color: var(--accent); }
+    .toast-info    { border-left-color: #7fc7d6; }
+
+    @keyframes toast-in {
+      from { opacity: 0; transform: translateY(12px) scale(0.98); }
+      to   { opacity: 1; transform: translateY(0) scale(1); }
+    }
+    @keyframes toast-out {
+      from { opacity: 1; transform: translateY(0); }
+      to   { opacity: 0; transform: translateY(8px); }
+    }
+
+    /* ==================================================================
+       Motion preferences
+       ================================================================== */
+    @media (prefers-reduced-motion: reduce) {
+      *, *::before, *::after {
+        animation-duration: 0.01ms !important;
+        animation-iteration-count: 1 !important;
+        transition-duration: 0.01ms !important;
+      }
+    }
+  </style>
+</head>
+
+<body>
+  <div class="aurora" aria-hidden="true"><span></span><span></span></div>
+
+  <div class="app">
+    <!-- ================================================================
+         Header
+         ================================================================ -->
+    <header class="site-header">
+      <div class="container header-inner">
+        <button type="button" id="home-nav" class="brand" aria-label="DropLink home">
+          <span class="brand-mark" aria-hidden="true">
+            <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor"
+                 stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M7 17 17 7"></path>
+              <path d="M9 7h8v8"></path>
+            </svg>
+          </span>
+          <span class="brand-name">DropLink</span>
+        </button>
+
+        <div class="header-actions">
+          <span class="status-pill" id="header-status" role="status" aria-live="polite">
+            <span class="status-dot" aria-hidden="true"></span>
+            <span id="header-status-text">Not connected</span>
+          </span>
+          <button type="button" id="history-nav" class="btn btn-ghost">History</button>
+        </div>
+      </div>
+    </header>
+
+    <!-- ================================================================
+         Main
+         ================================================================ -->
+    <main class="container main">
+
+      <!-- ============================ Dashboard ======================= -->
+      <section id="view-dashboard" class="view">
+        <div class="hero">
+          <p class="eyebrow">A simpler way to share</p>
+          <h1 class="display">Share files. Instantly. Anywhere.</h1>
+          <p class="lede">
+            A private path from one device to another. No uploads, no clutter — just a direct
+            peer-to-peer connection between two browser tabs.
+          </p>
+        </div>
+
+        <div class="action-grid">
+          <button type="button" id="send-nav" class="card action-card">
+            <span class="icon-badge is-solid" aria-hidden="true">
+              <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor"
+                   stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M7 17 17 7"></path>
+                <path d="M9 7h8v8"></path>
+              </svg>
+            </span>
+            <h2>Send files</h2>
+            <p>Pick your files, create a room, and share the six-digit connection code.</p>
+            <span class="card-cta">
+              Get started
+              <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor"
+                   stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M5 12h14"></path>
+                <path d="m13 6 6 6-6 6"></path>
+              </svg>
+            </span>
+          </button>
+
+          <button type="button" id="receive-nav" class="card action-card">
+            <span class="icon-badge" aria-hidden="true">
+              <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor"
+                   stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M17 7 7 17"></path>
+                <path d="M15 17H7V9"></path>
+              </svg>
+            </span>
+            <h2>Receive files</h2>
+            <p>Enter the code from the sender's tab to connect and download directly.</p>
+            <span class="card-cta">
+              Connect
+              <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor"
+                   stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M5 12h14"></path>
+                <path d="m13 6 6 6-6 6"></path>
+              </svg>
+            </span>
+          </button>
+        </div>
+
+        <aside class="card how-panel">
+          <h2>How it works</h2>
+          <div class="steps">
+            <div class="step">
+              <span class="step-num" aria-hidden="true">1</span>
+              <p>Open DropLink in two tabs of the same browser.</p>
+            </div>
+            <div class="step">
+              <span class="step-num" aria-hidden="true">2</span>
+              <p>Create a room in one tab and share the six-digit code.</p>
+            </div>
+            <div class="step">
+              <span class="step-num" aria-hidden="true">3</span>
+              <p>Enter the code in the other tab — WebRTC streams the files directly.</p>
+            </div>
+          </div>
+        </aside>
+      </section>
+
+      <!-- ============================== Send ========================== -->
+      <section id="view-send" class="view" hidden>
+        <button type="button" class="btn btn-ghost back-btn">← Back</button>
+        <h1 class="display">Send files</h1>
+        <p class="lede">Add your files, then share a connection code with another tab.</p>
+
+        <div class="card panel" style="margin-top: 28px;">
+          <!-- Drop zone -->
+          <div id="drop-zone" class="drop-zone" role="button" tabindex="0"
+               aria-label="Choose files or drop them here">
+            <div class="drop-icon" aria-hidden="true">
+              <svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor"
+                   stroke-width="2.1" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M12 16V4"></path>
+                <path d="m7 9 5-5 5 5"></path>
+                <path d="M4 16v2a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-2"></path>
+              </svg>
+            </div>
+            <p class="drop-title">Drop files here</p>
+            <p class="muted small">or choose multiple files from your device</p>
+            <span class="btn btn-ghost" style="margin-top: 16px;" id="pick-btn">Browse files</span>
+          </div>
+          <input type="file" id="file-input" class="sr-only" multiple aria-label="Select files">
+
+          <!-- Selected files -->
+          <div id="selected-wrap" hidden style="margin-top: 26px;">
+            <div class="section-head">
+              <h2 class="section-title">Selected files</h2>
+              <button type="button" id="clear-files" class="btn btn-ghost btn-sm">Clear all</button>
+            </div>
+            <div id="selected-list" class="list"></div>
+            <p id="selected-total" class="muted small" style="margin-top: 12px;"></p>
+            <button type="button" id="create-room" class="btn btn-primary btn-block">
+              Create connection room
+            </button>
+          </div>
+
+          <!-- Room / pairing -->
+          <div id="room-wrap" hidden>
+            <div class="divider"></div>
+            <h2 class="section-title" style="margin-bottom: 6px;">Ready to pair</h2>
+            <p class="muted small" style="margin-bottom: 22px;">
+              Open the link in another tab of this browser, or type the code there.
+            </p>
+
+            <div class="pair-grid">
+              <div id="qr" class="qr-box" aria-label="Pairing QR code"></div>
+              <div class="pair-info">
+                <p class="label">Connection code</p>
+                <p id="room-code" class="room-code" aria-live="polite"></p>
+                <p id="room-expiry" class="muted small" style="margin-top: 8px;"></p>
+                <div class="btn-row">
+                  <button type="button" id="copy-code" class="btn btn-ghost btn-sm">Copy code</button>
+                  <button type="button" id="copy-link" class="btn btn-ghost btn-sm">Copy link</button>
+                </div>
+                <p id="sender-status" class="status-line" role="status"></p>
+              </div>
+            </div>
+          </div>
+
+          <!-- Progress -->
+          <div id="send-progress" hidden>
+            <div class="divider"></div>
+            <h2 class="section-title" style="margin-bottom: 14px;">Transfer progress</h2>
+            <p id="send-current" class="current-file"></p>
+            <div class="progress-track">
+              <div id="send-bar" class="progress-fill"></div>
+            </div>
+            <p id="send-metrics" class="metrics" aria-live="polite"></p>
+          </div>
+
+          <!-- Actions -->
+          <div id="sender-actions" class="btn-row" hidden>
+            <button type="button" id="cancel-send" class="btn btn-ghost btn-sm">Cancel transfer</button>
+            <button type="button" id="retry-send" class="btn btn-ghost btn-sm" hidden>Retry connection</button>
+          </div>
+        </div>
+      </section>
+
+      <!-- ============================ Receive ========================= -->
+      <section id="view-receive" class="view" hidden>
+        <button type="button" class="btn btn-ghost back-btn">← Back</button>
+        <h1 class="display">Receive files</h1>
+        <p class="lede">Enter the six-digit code from the sender's tab.</p>
+
+        <div class="card panel" style="margin-top: 28px;">
+          <p class="note">
+            Camera scanning isn't available here — type the code, or open the sender's link
+            in another tab of this browser.
+          </p>
+
+          <form id="join-form" autocomplete="off" novalidate>
+            <span class="label" id="code-label">Connection code</span>
+            <div class="code-inputs" id="code-inputs" role="group" aria-labelledby="code-label">
+              <input class="code-digit" type="text" inputmode="numeric" autocomplete="off"
+                     maxlength="1" aria-label="Digit 1">
+              <input class="code-digit" type="text" inputmode="numeric" autocomplete="off"
+                     maxlength="1" aria-label="Digit 2">
+              <input class="code-digit" type="text" inputmode="numeric" autocomplete="off"
+                     maxlength="1" aria-label="Digit 3">
+              <input class="code-digit" type="text" inputmode="numeric" autocomplete="off"
+                     maxlength="1" aria-label="Digit 4">
+              <input class="code-digit" type="text" inputmode="numeric" autocomplete="off"
+                     maxlength="1" aria-label="Digit 5">
+              <input class="code-digit" type="text" inputmode="numeric" autocomplete="off"
+                     maxlength="1" aria-label="Digit 6">
+            </div>
+            <button type="submit" id="join-btn" class="btn btn-primary btn-block">Connect</button>
+          </form>
+
+          <p id="receiver-status" class="status-line" role="status"></p>
+
+          <!-- Progress -->
+          <div id="receive-progress" hidden>
+            <div class="divider"></div>
+            <h2 class="section-title" style="margin-bottom: 14px;">Incoming files</h2>
+            <p id="receive-current" class="current-file"></p>
+            <div class="progress-track">
+              <div id="receive-bar" class="progress-fill"></div>
+            </div>
+            <p id="receive-metrics" class="metrics" aria-live="polite"></p>
+          </div>
+
+          <!-- Received files -->
+          <div id="receive-files" hidden>
+            <div class="divider"></div>
+            <h2 class="section-title" style="margin-bottom: 14px;">Downloaded files</h2>
+            <div id="received-list" class="list"></div>
+          </div>
+
+          <!-- Actions -->
+          <div id="receiver-actions" class="btn-row" hidden>
+            <button type="button" id="cancel-receive" class="btn btn-ghost btn-sm">Cancel transfer</button>
+            <button type="button" id="retry-receive" class="btn btn-ghost btn-sm" hidden>Retry connection</button>
+          </div>
+        </div>
+      </section>
+
+      <!-- ============================ History ========================= -->
+      <section id="view-history" class="view" hidden>
+        <button type="button" class="btn btn-ghost back-btn">← Back</button>
+
+        <div class="section-head" style="margin-bottom: 26px;">
+          <h1 class="display">Recent activity</h1>
+          <button type="button" id="clear-history" class="btn btn-ghost btn-sm">Clear history</button>
+        </div>
+
+        <div class="card panel">
+          <p id="history-empty" class="empty-state">
+            No transfers yet. Your recent activity will appear here.
+          </p>
+          <div id="history-list"></div>
+        </div>
+      </section>
+    </main>
+
+    <!-- ================================================================
+         Footer
+         ================================================================ -->
+    <footer class="site-footer">
+      <div class="container">
+        <p>Direct browser-to-browser transfer · Nothing is uploaded to a server</p>
+      </div>
+    </footer>
+  </div>
+
+  <div class="toast-stack" id="toast-stack" aria-live="polite" aria-atomic="false"></div>
+
+  <script>
+  (() => {
+    'use strict';
+
+    /* ==================================================================
+       1. Configuration & constants
+       ================================================================== */
+    const CHUNK_SIZE      = 16 * 1024;          // 16 KiB per data-channel message
+    const HIGH_WATER      = 1024 * 1024;        // pause sending above 1 MiB buffered
+    const LOW_WATER       = 256 * 1024;         // resume when buffer drops below this
+    const BUFFER_TIMEOUT  = 20000;              // ms to wait for the buffer to drain
+    const ROOM_TTL        = 10 * 60 * 1000;     // room lifetime, 10 minutes
+    const JOIN_TIMEOUT    = 12000;              // ms to wait for a sender to answer
+    const HISTORY_KEY     = 'droplink.history.v1';
+    const HISTORY_LIMIT   = 30;
+    const TOAST_LIFETIME  = 4200;
+    const MAX_TOASTS      = 4;
+
+    const TAB_ID = (typeof crypto !== 'undefined' && crypto.randomUUID)
+      ? crypto.randomUUID()
+      : `tab-${Date.now()}-${Math.random().toString(36).slice(2)}`;
+
+    const SUPPORTS_RTC = typeof window.RTCPeerConnection === 'function';
+const SUPPORTS_BUS = Boolean(window.droplinkSupabase);
+
+    /* ==================================================================
+       2. DOM helpers
+       ================================================================== */
+    const $ = (id) => document.getElementById(id);
+    const $$ = (selector, root = document) => Array.from(root.querySelectorAll(selector));
+
+    const VIEW_IDS = ['dashboard', 'send', 'receive', 'history'];
+
+    /* ==================================================================
+       3. Application state
+       ================================================================== */
+    const state = {
+      // session
+      role: null,                 // 'sender' | 'receiver' | null
+      room: '',
+      roomStartedAt: 0,
+      active: false,
+
+      // transport
+      pc: null,
+      channel: null,
+      bus: null,
+
+      // sender
+      files: [],
+      totalBytes: 0,
+      bytesDone: 0,
+      startedAt: 0,
+      sendCompleted: 0,
+      sending: false,
+
+      // receiver
+      expectedFiles: 0,
+      completedFiles: 0,
+      receivedBytes: 0,
+      currentFile: null,
+      chunks: [],
+      chunkBytes: 0,
+      receivedList: []
+    };
+
+    let pendingIce = [];
+    let expiryTimer = null;
+    let countdownTimer = null;
+    let joinTimer = null;
+    let autoJoinTimer = null;
+    let progressFrame = 0;
+    let progressKind = 'send';
+    let dragDepth = 0;
+
+    /* ==================================================================
+       4. Formatting utilities
+       ================================================================== */
+    function fmt(bytes) {
+      if (!Number.isFinite(bytes) || bytes < 0) return '0 B';
+      if (bytes < 1024) return `${Math.round(bytes)} B`;
+      if (bytes < 1048576) return `${(bytes / 1024).toFixed(1)} KB`;
+      if (bytes < 1073741824) return `${(bytes / 1048576).toFixed(2)} MB`;
+      return `${(bytes / 1073741824).toFixed(2)} GB`;
+    }
+
+    function fmtSpeed(bytesPerSecond) {
+      if (!Number.isFinite(bytesPerSecond) || bytesPerSecond <= 0) return '0 B/s';
+      return `${fmt(bytesPerSecond)}/s`;
+    }
+
+    function fmtEta(seconds) {
+      if (!Number.isFinite(seconds) || seconds <= 0) return 'almost done';
+      if (seconds < 60) return `~${Math.ceil(seconds)}s left`;
+      const mins = Math.floor(seconds / 60);
+      const secs = Math.round(seconds % 60);
+      return `~${mins}m ${secs}s left`;
+    }
+
+    function fileGlyph(mime) {
+      const type = String(mime || '');
+      if (type.startsWith('image/')) return '▧';
+      if (type.startsWith('video/')) return '▷';
+      if (type.startsWith('audio/')) return '♪';
+      if (type.includes('pdf')) return '▤';
+      if (type.includes('zip') || type.includes('compressed')) return '❐';
+      if (type.startsWith('text/')) return '≡';
+      return '◫';
+    }
+
+    /* ==================================================================
+       5. Toasts
+       ================================================================== */
+    function toast(message, type = 'info') {
+      const stack = $('toast-stack');
+      if (!stack) return;
+
+      const el = document.createElement('div');
+      el.className = `toast toast-${type}`;
+      el.setAttribute('role', 'status');
+      el.textContent = message;
+      stack.append(el);
+
+      while (stack.children.length > MAX_TOASTS) {
+        stack.firstElementChild.remove();
+      }
+
+      window.setTimeout(() => {
+        el.classList.add('is-leaving');
+        window.setTimeout(() => el.remove(), 260);
+      }, TOAST_LIFETIME);
+    }
+
+    /* ==================================================================
+       6. View switching
+       ================================================================== */
+    function showView(name) {
+      VIEW_IDS.forEach((view) => {
+        const el = $(`view-${view}`);
+        if (el) el.hidden = view !== name;
+      });
+      if (name === 'history') renderHistory();
+      window.scrollTo(0, 0);
+    }
+
+    /* ==================================================================
+       7. Status helpers
+       ================================================================== */
+    function setStatus(text, connected = false) {
+      const pill = $('header-status');
+      const pillText = $('header-status-text');
+      if (pill && pillText) {
+        pill.classList.toggle('is-online', Boolean(connected));
+        pillText.textContent = connected ? 'Connected' : 'Not connected';
+      }
+
+      let line = null;
+      if (state.role === 'sender') line = $('sender-status');
+      else if (state.role === 'receiver') line = $('receiver-status');
+      if (line) line.textContent = text;
+    }
+
+    /* ==================================================================
+       8. History
+       ================================================================== */
+    function readHistory() {
+      try {
+        const raw = localStorage.getItem(HISTORY_KEY);
+        const parsed = raw ? JSON.parse(raw) : [];
+        return Array.isArray(parsed) ? parsed : [];
+      } catch (_) {
+        return [];
+      }
+    }
+
+    function addHistory(direction, status) {
+      const count = direction === 'sender'
+        ? state.files.length
+        : state.receivedList.length;
+
+      const entry = {
+        direction,
+        status,
+        files: count,
+        date: new Date().toISOString()
+      };
+
+      try {
+        const list = readHistory();
+        list.unshift(entry);
+        localStorage.setItem(HISTORY_KEY, JSON.stringify(list.slice(0, HISTORY_LIMIT)));
+      } catch (_) {
+        /* storage unavailable — silently ignore */
+      }
+
+      if (!$('view-history').hidden) renderHistory();
+    }
+
+    function statusClass(status) {
+      if (status === 'Completed') return 'is-success';
+      if (status === 'Cancelled') return 'is-warning';
+      return 'is-error';
+    }
+
+    function renderHistory() {
+      const list = $('history-list');
+      const empty = $('history-empty');
+      const clearBtn = $('clear-history');
+      if (!list || !empty || !clearBtn) return;
+
+      const rows = readHistory();
+      empty.hidden = rows.length > 0;
+      clearBtn.disabled = rows.length === 0;
+      list.replaceChildren();
+
+      rows.forEach((item) => {
+        const row = document.createElement('div');
+        row.className = 'history-row';
+
+        const badge = document.createElement('span');
+        badge.className = `history-badge ${statusClass(item.status)}`;
+        badge.textContent = item.direction === 'sender' ? '↑' : '↓';
+        badge.setAttribute('aria-hidden', 'true');
+
+        const info = document.createElement('div');
+        info.className = 'file-info';
+
+        const title = document.createElement('p');
+        title.className = 'file-name';
+        const verb = item.direction === 'sender' ? 'Sent' : 'Received';
+        const fileCount = Number(item.files) || 0;
+        title.textContent = `${verb} · ${fileCount} file${fileCount === 1 ? '' : 's'}`;
+
+        const date = document.createElement('p');
+        date.className = 'file-meta';
+        date.textContent = new Date(item.date).toLocaleString();
+
+        info.append(title, date);
+
+        const pill = document.createElement('span');
+        pill.className = `pill ${statusClass(item.status)}`;
+        pill.textContent = item.status;
+
+        row.append(badge, info, pill);
+        list.append(row);
+      });
+    }
+
+    /* ==================================================================
+       9. Signaling bus (BroadcastChannel with localStorage fallback)
+       ================================================================== */
+function createBus(room, onMessage) {
+  const supabase = window.droplinkSupabase;
+
+  const channel = supabase.channel(`droplink:${room}`, {
+    config: {
+      broadcast: {
+        self: false,
+        ack: true
+      }
+    }
+  });
+
+  let subscribed = false;
+  let closed = false;
+  const pendingMessages = [];
+
+  channel.on(
+    'broadcast',
+    { event: 'signal' },
+    (event) => {
+      if (closed) return;
+
+      onMessage(event.payload);
+    }
+  );
+
+  channel.subscribe((status) => {
+    if (status === 'SUBSCRIBED') {
+      subscribed = true;
+
+      // Send messages that were queued before connection.
+      while (pendingMessages.length > 0) {
+        const payload = pendingMessages.shift();
+
+        channel.send({
+          type: 'broadcast',
+          event: 'signal',
+          payload
+        }).catch((error) => {
+          console.error('Supabase send error:', error);
+        });
+      }
+    }
+
+    if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT') {
+      console.error('Supabase channel error:', status);
+    }
+  });
+
+  return {
+    post(payload) {
+      if (closed) return;
+
+      if (!subscribed) {
+        pendingMessages.push(payload);
+        return;
+      }
+
+      channel.send({
+        type: 'broadcast',
+        event: 'signal',
+        payload
+      }).catch((error) => {
+        console.error('Supabase broadcast error:', error);
+      });
+    },
+
+    close() {
+      closed = true;
+      subscribed = false;
+      pendingMessages.length = 0;
+
+      supabase.removeChannel(channel);
+    }
+  };
+}
+
+    function signal(payload) {
+      if (!state.bus) return;
+      state.bus.post({ ...payload, from: TAB_ID, room: state.room });
+    }
+
+    function openBus(room) {
+      if (state.bus) {
+        try { state.bus.close(); } catch (_) { /* ignore */ }
+      }
+      state.bus = createBus(room, handleSignal);
+    }
+
+    /* ==================================================================
+       10. Timers
+       ================================================================== */
+    function clearTimers() {
+      window.clearInterval(expiryTimer);
+      window.clearInterval(countdownTimer);
+      window.clearTimeout(joinTimer);
+      window.clearTimeout(autoJoinTimer);
+      expiryTimer = null;
+      countdownTimer = null;
+      joinTimer = null;
+      autoJoinTimer = null;
+    }
+
+    /* ==================================================================
+       11. Connection lifecycle
+       ================================================================== */
+    function closeConnection() {
+      state.active = false;
+      clearTimers();
+
+      if (state.channel) {
+        try { state.channel.close(); } catch (_) { /* ignore */ }
+        state.channel = null;
+      }
+      if (state.pc) {
+        try { state.pc.close(); } catch (_) { /* ignore */ }
+        state.pc = null;
+      }
+      if (state.bus) {
+        try { state.bus.close(); } catch (_) { /* ignore */ }
+        state.bus = null;
+      }
+      pendingIce = [];
+    }
+
+    /**
+     * Terminates the current transfer, updates the UI and records history.
+     */
+    function endTransfer(message, status, toastType) {
+      if (!state.active) return;
+
+      const direction = state.role;
+      closeConnection();
+      setStatus(message);
+
+      if (message) toast(message, toastType || (status === 'Completed' ? 'success' : 'info'));
+      addHistory(direction, status);
+
+      if (direction === 'sender') {
+        const retry = $('retry-send');
+        if (retry) retry.hidden = false;
+      } else if (direction === 'receiver') {
+        const retry = $('retry-receive');
+        if (retry) retry.hidden = false;
+      }
+    }
+
+    function failTransfer(message) {
+      endTransfer(message, 'Interrupted', 'error');
+    }
+
+    function cancelTransfer() {
+      if (!state.active) return;
+      signal({ type: 'cancel' });
+      endTransfer('Transfer cancelled.', 'Cancelled', 'info');
+    }
+
+    /* ==================================================================
+       12. Reset / cleanup
+       ================================================================== */
+    function clearReceivedFiles() {
+      state.receivedList.forEach((item) => {
+        try { URL.revokeObjectURL(item.url); } catch (_) { /* ignore */ }
+      });
+      state.receivedList = [];
+      renderReceivedFiles();
+    }
+
+    function resetTransfer() {
+      closeConnection();
+
+      state.pc = null;
+      state.channel = null;
+      state.bus = null;
+      state.sending = false;
+
+      state.totalBytes = 0;
+      state.bytesDone = 0;
+      state.startedAt = 0;
+      state.sendCompleted = 0;
+
+      state.expectedFiles = 0;
+      state.completedFiles = 0;
+      state.receivedBytes = 0;
+      state.currentFile = null;
+      state.chunks = [];
+      state.chunkBytes = 0;
+
+      pendingIce = [];
+
+      $('send-progress').hidden = true;
+      $('receive-progress').hidden = true;
+      $('send-bar').style.width = '0%';
+      $('receive-bar').style.width = '0%';
+      $('send-current').textContent = '';
+      $('receive-current').textContent = '';
+      $('send-metrics').textContent = '';
+      $('receive-metrics').textContent = '';
+
+      $('retry-send').hidden = true;
+      $('retry-receive').hidden = true;
+      $('sender-actions').hidden = true;
+      $('receiver-actions').hidden = true;
+    }
+
+    /* ==================================================================
+       13. Progress rendering (throttled with requestAnimationFrame)
+       ================================================================== */
+    function scheduleProgress(kind) {
+      progressKind = kind;
+      if (progressFrame) return;
+      progressFrame = window.requestAnimationFrame(() => {
+        progressFrame = 0;
+        renderProgress(progressKind);
+      });
+    }
+
+    function renderProgress(kind) {
+      const isSend = kind === 'send';
+      const done = isSend ? state.bytesDone : state.receivedBytes;
+      const total = state.totalBytes || 0;
+
+      if (!state.startedAt) state.startedAt = performance.now();
+
+      const elapsed = Math.max((performance.now() - state.startedAt) / 1000, 0.15);
+      const speed = done / elapsed;
+      const pct = total > 0 ? Math.min(100, (done / total) * 100) : 0;
+      const remaining = Math.max(0, total - done);
+
+      const panel = isSend ? $('send-progress') : $('receive-progress');
+      const bar = isSend ? $('send-bar') : $('receive-bar');
+      const metrics = isSend ? $('send-metrics') : $('receive-metrics');
+
+      if (panel) panel.hidden = false;
+      if (bar) bar.style.width = `${pct.toFixed(2)}%`;
+      if (metrics) {
+        metrics.textContent = [
+          `${pct.toFixed(1)}%`,
+          `${fmt(done)} of ${fmt(total)}`,
+          fmtSpeed(speed),
+          remaining > 0 ? fmtEta(remaining / Math.max(speed, 1)) : 'finishing…'
+        ].join(' · ');
+      }
+    }
+
+    /* ==================================================================
+       14. Selected files UI
+       ================================================================== */
+    function renderSelectedFiles() {
+      const wrap = $('selected-wrap');
+      const list = $('selected-list');
+      const total = $('selected-total');
+
+      wrap.hidden = state.files.length === 0;
+      list.replaceChildren();
+
+      state.files.forEach((file, index) => {
+        const row = document.createElement('div');
+        row.className = 'file-row';
+
+        const icon = document.createElement('span');
+        icon.className = 'file-icon';
+        icon.textContent = fileGlyph(file.type);
+        icon.setAttribute('aria-hidden', 'true');
+
+        const info = document.createElement('div');
+        info.className = 'file-info';
+
+        const name = document.createElement('p');
+        name.className = 'file-name';
+        name.textContent = file.name;
+        name.title = file.name;
+
+        const meta = document.createElement('p');
+        meta.className = 'file-meta';
+        meta.textContent = `${fmt(file.size)} · ${file.type || 'Unknown type'}`;
+
+        info.append(name, meta);
+
+        const remove = document.createElement('button');
+        remove.type = 'button';
+        remove.className = 'btn btn-ghost btn-sm';
+        remove.textContent = 'Remove';
+        remove.setAttribute('aria-label', `Remove ${file.name}`);
+        remove.disabled = state.active;
+        remove.addEventListener('click', () => {
+          state.files.splice(index, 1);
+          renderSelectedFiles();
+        });
+
+        row.append(icon, info, remove);
+        list.append(row);
+      });
+
+      const bytes = state.files.reduce((sum, file) => sum + file.size, 0);
+      total.textContent = state.files.length
+        ? `${state.files.length} file${state.files.length === 1 ? '' : 's'} · ${fmt(bytes)} total`
+        : '';
+    }
+
+    function addFiles(fileList) {
+      if (state.active) {
+        toast('Finish or cancel the current transfer first.', 'error');
+        return;
+      }
+
+      const incoming = Array.from(fileList || []);
+      if (incoming.length === 0) return;
+
+      const existing = new Set(
+        state.files.map((file) => `${file.name}:${file.size}:${file.lastModified}`)
+      );
+
+      let added = 0;
+      let skipped = 0;
+
+      incoming.forEach((file) => {
+        const key = `${file.name}:${file.size}:${file.lastModified}`;
+        if (existing.has(key)) {
+          skipped += 1;
+          return;
+        }
+        existing.add(key);
+        state.files.push(file);
+        added += 1;
+      });
+
+      renderSelectedFiles();
+
+      if (added > 0) {
+        toast(`Added ${added} file${added === 1 ? '' : 's'}.`, 'success');
+      } else if (skipped > 0) {
+        toast('Those files are already in the list.', 'info');
+      }
+    }
+
+    /* ==================================================================
+       15. Received files UI
+       ================================================================== */
+    function renderReceivedFiles() {
+      const wrap = $('receive-files');
+      const list = $('received-list');
+      if (!wrap || !list) return;
+
+      list.replaceChildren();
+
+      if (state.receivedList.length === 0) {
+        wrap.hidden = true;
+        return;
+      }
+      wrap.hidden = false;
+
+      state.receivedList.forEach((item) => {
+        const row = document.createElement('div');
+        row.className = 'file-row';
+
+        const icon = document.createElement('span');
+        icon.className = 'file-icon';
+        icon.textContent = fileGlyph(item.mime);
+        icon.setAttribute('aria-hidden', 'true');
+
+        const info = document.createElement('div');
+        info.className = 'file-info';
+
+        const name = document.createElement('p');
+        name.className = 'file-name';
+        name.textContent = item.name;
+        name.title = item.name;
+
+        const meta = document.createElement('p');
+        meta.className = 'file-meta';
+        meta.textContent = fmt(item.size);
+
+        info.append(name, meta);
+
+        const download = document.createElement('a');
+        download.className = 'btn btn-ghost btn-sm';
+        download.href = item.url;
+        download.download = item.name;
+        download.textContent = 'Download';
+
+        row.append(icon, info, download);
+        list.append(row);
+      });
+    }
+
+    function triggerDownload(url, filename) {
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = filename;
+      link.rel = 'noopener';
+      document.body.append(link);
+      link.click();
+      link.remove();
+    }
+
+    /* ==================================================================
+       16. Room creation (sender)
+       ================================================================== */
+    function generateRoomCode() {
+      const buffer = new Uint32Array(1);
+      crypto.getRandomValues(buffer);
+      return String(100000 + (buffer[0] % 900000));
+    }
+
+    function buildRoomLink(room) {
+      const url = new URL(window.location.href);
+      url.hash = `receive=${room}`;
+      return url.toString();
+    }
+
+    function createRoom() {
+      if (!SUPPORTS_RTC || !SUPPORTS_BUS) {
+        toast('This browser cannot open a direct peer connection.', 'error');
+        return;
+      }
+      if (state.files.length === 0) {
+        toast('Add at least one file first.', 'error');
+        return;
+      }
+
+      resetTransfer();
+
+      state.role = 'sender';
+      state.room = generateRoomCode();
+      state.roomStartedAt = Date.now();
+      state.active = true;
+
+      openBus(state.room);
+      renderRoomPanel();
+
+      $('sender-actions').hidden = false;
+      renderSelectedFiles();
+
+      setStatus('Waiting for a receiver in another tab…');
+      startCountdown();
+
+      expiryTimer = window.setInterval(() => {
+        if (!state.active || state.pc) return;
+        if (Date.now() - state.roomStartedAt >= ROOM_TTL) {
+          failTransfer('This room expired. Create a new one.');
+        }
+      }, 1000);
+    }
+
+    function renderRoomPanel() {
+      $('room-code').textContent = state.room;
+      $('room-wrap').hidden = false;
+
+      const qrHost = $('qr');
+      qrHost.replaceChildren();
+
+      if (window.QRCode) {
+        try {
+          new window.QRCode(qrHost, {
+            text: buildRoomLink(state.room),
+            width: 152,
+            height: 152,
+            colorDark: '#0a0f14',
+            colorLight: '#ffffff',
+            correctLevel: window.QRCode.CorrectLevel.M
+          });
+        } catch (_) {
+          qrHost.textContent = 'QR unavailable — share the code instead.';
+        }
+      } else {
+        qrHost.textContent = 'QR unavailable — share the code instead.';
+      }
+
+      $('copy-code').onclick = () => copyText(state.room, 'Connection code copied.');
+      $('copy-link').onclick = () => copyText(buildRoomLink(state.room), 'Connection link copied.');
+    }
+
+    function startCountdown() {
+      window.clearInterval(countdownTimer);
+
+      const tick = () => {
+        const el = $('room-expiry');
+        if (!el) return;
+
+        if (!state.active) {
+          el.textContent = '';
+          return;
+        }
+        if (state.pc) {
+          el.textContent = 'Connected — this room no longer expires.';
+          return;
+        }
+
+        const remaining = Math.max(0, state.roomStartedAt + ROOM_TTL - Date.now());
+        const mins = Math.floor(remaining / 60000);
+        const secs = Math.floor((remaining % 60000) / 1000);
+        el.textContent = `Expires in ${mins}:${String(secs).padStart(2, '0')} while this tab stays open.`;
+      };
+
+      tick();
+      countdownTimer = window.setInterval(tick, 1000);
+    }
+
+    /* ==================================================================
+       17. Clipboard
+       ================================================================== */
+    async function copyText(text, successMessage) {
+      try {
+        if (navigator.clipboard && navigator.clipboard.writeText) {
+          await navigator.clipboard.writeText(text);
+          toast(successMessage, 'success');
+          return;
+        }
+        throw new Error('Clipboard API unavailable');
+      } catch (_) {
+        const area = document.createElement('textarea');
+        area.value = text;
+        area.setAttribute('readonly', '');
+        area.style.position = 'fixed';
+        area.style.top = '-1000px';
+        area.style.opacity = '0';
+        document.body.append(area);
+        area.select();
+
+        try {
+          document.execCommand('copy');
+          toast(successMessage, 'success');
+        } catch (__) {
+          toast('Copy failed — select the value manually.', 'error');
+        } finally {
+          area.remove();
+        }
+      }
+    }
+
+    /* ==================================================================
+       18. Peer connection
+       ================================================================== */
+    function createPeerConnection() {
+      const pc = new RTCPeerConnection({
+        iceServers: [{ urls: 'stun:stun.l.google.com:19302' }]
+      });
+      state.pc = pc;
+
+      pc.onicecandidate = (event) => {
+        if (event.candidate) {
+          signal({ type: 'ice', candidate: event.candidate.toJSON() });
+        }
+      };
+
+      pc.onconnectionstatechange = () => {
+        if (!state.active || state.pc !== pc) return;
+
+        if (pc.connectionState === 'failed') {
+          failTransfer('The peer connection failed. Please retry.');
+        } else if (pc.connectionState === 'disconnected') {
+          window.setTimeout(() => {
+            if (!state.active || state.pc !== pc) return;
+            if (pc.connectionState === 'disconnected') {
+              failTransfer('The peer connection was lost. Please retry.');
+            }
+          }, 5000);
+        }
+      };
+
+      if (state.role === 'sender') {
+        const channel = pc.createDataChannel('files', { ordered: true });
+        setupChannel(channel);
+      } else {
+        pc.ondatachannel = (event) => setupChannel(event.channel);
+      }
+
+      return pc;
+    }
+
+    async function addRemoteIce(candidate) {
+      if (!candidate) return;
+      if (!state.pc || !state.pc.remoteDescription) {
+        pendingIce.push(candidate);
+        return;
+      }
+      try {
+        await state.pc.addIceCandidate(candidate);
+      } catch (_) {
+        /* stale candidates are harmless */
+      }
+    }
+
+    async function flushPendingIce() {
+      if (!state.pc || !state.pc.remoteDescription) return;
+      const queued = pendingIce;
+      pendingIce = [];
+      for (const candidate of queued) {
+        try {
+          await state.pc.addIceCandidate(candidate);
+        } catch (_) {
+          /* ignore */
+        }
+      }
+    }
+
+    /* ==================================================================
+       19. Signaling handler
+       ================================================================== */
+    async function handleSignal(data) {
+      if (!state.active || !data || data.from === TAB_ID || data.room !== state.room) return;
+
+      try {
+        switch (data.type) {
+          case 'hello': {
+            if (state.role !== 'sender' || state.pc) return;
+            if (Date.now() - state.roomStartedAt >= ROOM_TTL) {
+              failTransfer('This room expired. Create a new one.');
+              return;
+            }
+            await startOffer();
+            break;
+          }
+
+          case 'offer': {
+            if (state.role !== 'receiver' || state.pc) return;
+            if (Date.now() - (data.createdAt || 0) >= ROOM_TTL) {
+              failTransfer('That room expired. Ask the sender for a new code.');
+              return;
+            }
+            await acceptOffer(data.description);
+            break;
+          }
+
+          case 'answer': {
+            if (state.role !== 'sender' || !state.pc) return;
+            await state.pc.setRemoteDescription(data.description);
+            await flushPendingIce();
+            break;
+          }
+
+          case 'ice': {
+            await addRemoteIce(data.candidate);
+            break;
+          }
+
+          case 'cancel': {
+            endTransfer('The other tab cancelled the transfer.', 'Cancelled', 'info');
+            break;
+          }
+
+          default:
+            break;
+        }
+      } catch (_) {
+        failTransfer('Could not establish the direct connection. Please retry.');
+      }
+    }
+
+    async function startOffer() {
+      createPeerConnection();
+      const offer = await state.pc.createOffer();
+      await state.pc.setLocalDescription(offer);
+      signal({
+        type: 'offer',
+        description: state.pc.localDescription,
+        createdAt: state.roomStartedAt
+      });
+      setStatus('Receiver found — establishing a direct connection…');
+    }
+
+    async function acceptOffer(description) {
+      createPeerConnection();
+      await state.pc.setRemoteDescription(description);
+      await flushPendingIce();
+
+      const answer = await state.pc.createAnswer();
+      await state.pc.setLocalDescription(answer);
+      signal({ type: 'answer', description: state.pc.localDescription });
+
+      setStatus('Connecting to the sender…');
+    }
+
+    /* ==================================================================
+       20. Data channel
+       ================================================================== */
+    function setupChannel(channel) {
+      state.channel = channel;
+      channel.binaryType = 'arraybuffer';
+      channel.bufferedAmountLowThreshold = LOW_WATER;
+
+      channel.onopen = () => {
+        if (!state.active) return;
+
+        if (state.role === 'sender') {
+          setStatus('Direct connection established — sending files…', true);
+          state.startedAt = performance.now();
+          sendFiles().catch(() => {
+            failTransfer('The transfer stopped unexpectedly. Please retry.');
+          });
+        } else {
+          setStatus('Connected to the sender — waiting for files…', true);
+        }
+      };
+
+      channel.onmessage = (event) => {
+        if (state.role === 'sender') handleSenderMessage(event.data);
+        else handleReceiverMessage(event.data);
+      };
+
+      channel.onclose = () => {
+        if (!state.active) return;
+
+        const finished = state.role === 'sender'
+          ? state.sendCompleted >= state.files.length
+          : state.expectedFiles > 0 && state.completedFiles >= state.expectedFiles;
+
+        if (!finished) {
+          failTransfer('The connection closed before the transfer finished.');
+        }
+      };
+    }
+
+    function sendMeta(payload) {
+      const channel = state.channel;
+      if (channel && channel.readyState === 'open') {
+        channel.send(JSON.stringify(payload));
+      }
+    }
+
+    function waitForDrain() {
+      return new Promise((resolve, reject) => {
+        const channel = state.channel;
+
+        if (!channel || channel.readyState !== 'open') {
+          reject(new Error('Channel closed'));
+          return;
+        }
+        if (channel.bufferedAmount <= HIGH_WATER) {
+          resolve();
+          return;
+        }
+
+        let settled = false;
+
+        const finish = (error) => {
+          if (settled) return;
+          settled = true;
+          channel.removeEventListener('bufferedamountlow', onLow);
+          window.clearTimeout(timer);
+          if (error) reject(error);
+          else resolve();
+        };
+
+        const onLow = () => finish();
+
+        const timer = window.setTimeout(
+          () => finish(new Error('Buffer drain timeout')),
+          BUFFER_TIMEOUT
+        );
+
+        channel.addEventListener('bufferedamountlow', onLow, { once: true });
+      });
+    }
+
+    /* ==================================================================
+       21. Sending
+       ================================================================== */
+    async function sendFiles() {
+      const files = state.files;
+
+      state.sending = true;
+      state.totalBytes = files.reduce((sum, file) => sum + file.size, 0);
+      state.bytesDone = 0;
+      state.sendCompleted = 0;
+      state.startedAt = performance.now();
+
+      sendMeta({ kind: 'manifest', count: files.length, total: state.totalBytes });
+
+      for (let index = 0; index < files.length; index += 1) {
+        if (!state.active) return;
+
+        const file = files[index];
+        sendMeta({
+          kind: 'start',
+          index,
+          name: file.name,
+          size: file.size,
+          mime: file.type || 'application/octet-stream'
+        });
+
+        $('send-current').textContent =
+          `${file.name} · file ${index + 1} of ${files.length}`;
+        scheduleProgress('send');
+
+        for (let offset = 0; offset < file.size; offset += CHUNK_SIZE) {
+          if (!state.active) return;
+
+          await waitForDrain();
+
+          if (!state.active || !state.channel || state.channel.readyState !== 'open') {
+            throw new Error('Channel closed');
+          }
+
+          const buffer = await file.slice(offset, offset + CHUNK_SIZE).arrayBuffer();
+
+          if (!state.active || !state.channel || state.channel.readyState !== 'open') {
+            throw new Error('Channel closed');
+          }
+
+          state.channel.send(buffer);
+          state.bytesDone += buffer.byteLength;
+          scheduleProgress('send');
+        }
+
+        await waitForDrain();
+        if (!state.active) return;
+
+        sendMeta({ kind: 'end', index });
+      }
+
+      await waitForDrain();
+      if (!state.active) return;
+
+      sendMeta({ kind: 'done' });
+      state.sending = false;
+
+      setStatus('All files sent — waiting for the receiver to confirm…', true);
+    }
+
+    function handleSenderMessage(data) {
+      if (typeof data !== 'string') return;
+
+      let message;
+      try {
+        message = JSON.parse(data);
+      } catch (_) {
+        return;
+      }
+
+      if (message.kind === 'ack' && Number.isInteger(message.count)) {
+        state.sendCompleted = message.count;
+        scheduleProgress('send');
+        return;
+      }
+
+      if (message.kind === 'complete') {
+        completeSend();
+      }
+    }
+
+    function completeSend() {
+      if (!state.active) return;
+
+      const count = state.files.length;
+
+      $('send-current').textContent = 'All files delivered';
+      $('send-bar').style.width = '100%';
+      $('send-metrics').textContent =
+        `${count} file${count === 1 ? '' : 's'} · ${fmt(state.totalBytes)} delivered`;
+
+      setStatus('Transfer complete — the receiver confirmed every file.', true);
+      addHistory('sender', 'Completed');
+      toast('Transfer complete.', 'success');
+
+      $('sender-actions').hidden = true;
+
+      window.setTimeout(() => {
+        if (state.role === 'sender') closeConnection();
+      }, 1200);
+    }
+
+    /* ==================================================================
+       22. Receiving
+       ================================================================== */
+    function handleReceiverMessage(data) {
+      // Binary chunk
+      if (typeof data !== 'string') {
+        if (!state.currentFile) {
+          failTransfer('Received unexpected file data.');
+          return;
+        }
+
+        const chunk = data;
+        state.chunks.push(chunk);
+        state.chunkBytes += chunk.byteLength;
+        state.receivedBytes += chunk.byteLength;
+
+        if (state.chunkBytes > state.currentFile.size) {
+          failTransfer('Received more data than expected.');
+          return;
+        }
+
+        scheduleProgress('receive');
+        return;
+      }
+
+      let message;
+      try {
+        message = JSON.parse(data);
+      } catch (_) {
+        failTransfer('Received corrupt transfer data.');
+        return;
+      }
+
+      switch (message.kind) {
+        case 'manifest': {
+          const valid = Number.isInteger(message.count)
+            && message.count >= 1
+            && Number.isSafeInteger(message.total)
+            && message.total >= 0;
+
+          if (!valid) {
+            failTransfer('Received an invalid file manifest.');
+            return;
+          }
+
+          state.expectedFiles = message.count;
+          state.totalBytes = message.total;
+          state.completedFiles = 0;
+          state.receivedBytes = 0;
+          state.startedAt = performance.now();
+
+          setStatus(
+            `Receiving ${message.count} file${message.count === 1 ? '' : 's'}…`,
+            true
+          );
+          $('receive-progress').hidden = false;
+          scheduleProgress('receive');
+          break;
+        }
+
+        case 'start': {
+          const valid = typeof message.name === 'string'
+            && Number.isSafeInteger(message.size)
+            && message.size >= 0;
+
+          if (state.currentFile || !valid) {
+            failTransfer('Received an invalid file header.');
+            return;
+          }
+
+          state.currentFile = message;
+          state.chunks = [];
+          state.chunkBytes = 0;
+
+          $('receive-current').textContent =
+            `${message.name} · file ${state.completedFiles + 1} of ${state.expectedFiles}`;
+          scheduleProgress('receive');
+          break;
+        }
+
+        case 'end': {
+          if (!state.currentFile) {
+            failTransfer('Received an end marker without a file.');
+            return;
+          }
+          if (state.chunkBytes !== state.currentFile.size) {
+            failTransfer('A file arrived incomplete.');
+            return;
+          }
+          finishReceivedFile();
+          break;
+        }
+
+        case 'done': {
+          if (state.currentFile || state.completedFiles !== state.expectedFiles) {
+            failTransfer('The transfer ended before all files arrived.');
+            return;
+          }
+          sendMeta({ kind: 'complete' });
+          completeReceive();
+          break;
+        }
+
+        default:
+          break;
+      }
+    }
+
+    function finishReceivedFile() {
+      const info = state.currentFile;
+
+      const blob = new Blob(state.chunks, {
+        type: info.mime || 'application/octet-stream'
+      });
+      const url = URL.createObjectURL(blob);
+
+      state.receivedList.push({
+        name: info.name,
+        size: info.size,
+        mime: info.mime,
+        url
+      });
+      renderReceivedFiles();
+
+      triggerDownload(url, info.name);
+
+      state.completedFiles += 1;
+      state.currentFile = null;
+      state.chunks = [];
+      state.chunkBytes = 0;
+
+      sendMeta({ kind: 'ack', count: state.completedFiles });
+      scheduleProgress('receive');
+
+      toast(`Saved “${info.name}” (${fmt(info.size)})`, 'success');
+    }
+
+    function completeReceive() {
+      if (!state.active) return;
+
+      $('receive-current').textContent = 'All files received';
+      $('receive-bar').style.width = '100%';
+      $('receive-metrics').textContent =
+        `${state.receivedList.length} file${state.receivedList.length === 1 ? '' : 's'} · ${fmt(state.totalBytes)}`;
+
+      setStatus('Transfer complete — all files received.', true);
+      addHistory('receiver', 'Completed');
+      toast('Transfer complete.', 'success');
+
+      $('receiver-actions').hidden = true;
+
+      window.setTimeout(() => {
+        if (state.role === 'receiver') closeConnection();
+      }, 1200);
+    }
+
+    /* ==================================================================
+       23. Joining a room (receiver)
+       ================================================================== */
+    function readCodeInputs() {
+      return codeInputs.map((input) => input.value).join('');
+    }
+
+    function setCodeInputs(value) {
+      const digits = String(value).replace(/\D/g, '').slice(0, 6).split('');
+      codeInputs.forEach((input, index) => {
+        input.value = digits[index] || '';
+      });
+    }
+
+    function focusFirstEmptyDigit() {
+      const target = codeInputs.find((input) => !input.value)
+        || codeInputs[codeInputs.length - 1];
+      if (target) target.focus();
+    }
+
+    function joinRoom() {
+      const code = readCodeInputs();
+
+      if (!/^\d{6}$/.test(code)) {
+        toast('Enter the full six-digit code.', 'error');
+        focusFirstEmptyDigit();
+        return;
+      }
+
+      if (!SUPPORTS_RTC || !SUPPORTS_BUS) {
+        toast('This browser cannot open a direct peer connection.', 'error');
+        return;
+      }
+
+      if (state.active && state.role === 'receiver' && state.room === code) {
+        return;
+      }
+
+      clearReceivedFiles();
+      resetTransfer();
+
+      state.role = 'receiver';
+      state.room = code;
+      state.active = true;
+
+      openBus(code);
+
+      $('receiver-actions').hidden = false;
+      setStatus('Looking for the sender in another tab…');
+
+      signal({ type: 'hello' });
+
+      window.clearTimeout(joinTimer);
+      joinTimer = window.setTimeout(() => {
+        if (state.active && state.role === 'receiver' && state.room === code && !state.pc) {
+          failTransfer('No sender found. Check the code and keep the sender tab open.');
+        }
+      }, JOIN_TIMEOUT);
+    }
+
+    /* ==================================================================
+       24. Code input widget
+       ================================================================== */
+    const codeInputs = $$('.code-digit');
+
+    function distributeDigits(digits, startIndex) {
+      let cursor = startIndex;
+      for (const char of digits) {
+        if (cursor >= codeInputs.length) break;
+        codeInputs[cursor].value = char;
+        cursor += 1;
+      }
+      const nextIndex = Math.min(cursor, codeInputs.length - 1);
+      if (codeInputs[nextIndex]) codeInputs[nextIndex].focus();
+      maybeAutoJoin();
+    }
+
+    function maybeAutoJoin() {
+      if (!/^\d{6}$/.test(readCodeInputs())) return;
+      window.clearTimeout(autoJoinTimer);
+      autoJoinTimer = window.setTimeout(() => joinRoom(), 240);
+    }
+
+    function bindCodeInputs() {
+      codeInputs.forEach((input, index) => {
+        input.addEventListener('input', () => {
+          const digits = input.value.replace(/\D/g, '');
+
+          if (!digits) {
+            input.value = '';
+            return;
+          }
+          if (digits.length > 1) {
+            distributeDigits(digits, index);
+            return;
+          }
+
+          input.value = digits;
+          if (index < codeInputs.length - 1) {
+            codeInputs[index + 1].focus();
+          }
+          maybeAutoJoin();
+        });
+
+        input.addEventListener('keydown', (event) => {
+          if (event.key === 'Backspace' && !input.value && index > 0) {
+            event.preventDefault();
+            codeInputs[index - 1].value = '';
+            codeInputs[index - 1].focus();
+          } else if (event.key === 'ArrowLeft' && index > 0) {
+            event.preventDefault();
+            codeInputs[index - 1].focus();
+          } else if (event.key === 'ArrowRight' && index < codeInputs.length - 1) {
+            event.preventDefault();
+            codeInputs[index + 1].focus();
+          }
+        });
+
+        input.addEventListener('paste', (event) => {
+          const clipboard = event.clipboardData || window.clipboardData;
+          if (!clipboard) return;
+
+          const digits = clipboard.getData('text').replace(/\D/g, '').slice(0, 6);
+          if (!digits) return;
+
+          event.preventDefault();
+          distributeDigits(digits, 0);
+        });
+
+        input.addEventListener('focus', () => input.select());
+      });
+    }
+
+    /* ==================================================================
+       25. Hash routing (#receive=123456)
+       ================================================================== */
+    function handleHash() {
+      const match = /^#receive=(\d{6})$/.exec(window.location.hash);
+      if (!match) return;
+
+      setCodeInputs(match[1]);
+      showView('receive');
+
+      try {
+        history.replaceState(null, '', window.location.pathname + window.location.search);
+      } catch (_) {
+        /* ignore */
+      }
+
+      window.setTimeout(() => joinRoom(), 120);
+    }
+
+    /* ==================================================================
+       26. Event wiring
+       ================================================================== */
+    function bindEvents() {
+      // Navigation ---------------------------------------------------
+      $('home-nav').addEventListener('click', () => showView('dashboard'));
+      $('history-nav').addEventListener('click', () => showView('history'));
+      $('send-nav').addEventListener('click', () => showView('send'));
+      $('receive-nav').addEventListener('click', () => showView('receive'));
+      $$('.back-btn').forEach((button) => {
+        button.addEventListener('click', () => showView('dashboard'));
+      });
+
+      // Send view: file picking --------------------------------------
+      const dropZone = $('drop-zone');
+      const fileInput = $('file-input');
+
+      $('pick-btn').addEventListener('click', (event) => {
+        event.stopPropagation();
+        fileInput.click();
+      });
+
+      dropZone.addEventListener('click', () => fileInput.click());
+
+      dropZone.addEventListener('keydown', (event) => {
+        if (event.key === 'Enter' || event.key === ' ') {
+          event.preventDefault();
+          fileInput.click();
+        }
+      });
+
+      fileInput.addEventListener('change', (event) => {
+        addFiles(event.target.files);
+        event.target.value = '';
+      });
+
+      ['dragenter', 'dragover'].forEach((type) => {
+        dropZone.addEventListener(type, (event) => {
+          event.preventDefault();
+          if (type === 'dragenter') dragDepth += 1;
+          dropZone.classList.add('is-dragging');
+        });
+      });
+
+      dropZone.addEventListener('dragleave', (event) => {
+        event.preventDefault();
+        dragDepth = Math.max(0, dragDepth - 1);
+        if (dragDepth === 0) dropZone.classList.remove('is-dragging');
+      });
+
+      dropZone.addEventListener('drop', (event) => {
+        event.preventDefault();
+        dragDepth = 0;
+        dropZone.classList.remove('is-dragging');
+        if (event.dataTransfer) addFiles(event.dataTransfer.files);
+      });
+
+      // Prevent the browser from navigating away on stray drops.
+      ['dragover', 'drop'].forEach((type) => {
+        window.addEventListener(type, (event) => event.preventDefault());
+      });
+
+      $('clear-files').addEventListener('click', () => {
+        if (state.active) {
+          toast('Finish or cancel the current transfer first.', 'error');
+          return;
+        }
+        state.files = [];
+        renderSelectedFiles();
+      });
+
+      $('create-room').addEventListener('click', createRoom);
+      $('cancel-send').addEventListener('click', cancelTransfer);
+      $('retry-send').addEventListener('click', createRoom);
+
+      // Receive view -------------------------------------------------
+      $('join-form').addEventListener('submit', (event) => {
+        event.preventDefault();
+        joinRoom();
+      });
+      $('cancel-receive').addEventListener('click', cancelTransfer);
+      $('retry-receive').addEventListener('click', () => joinRoom());
+
+      // History ------------------------------------------------------
+      $('clear-history').addEventListener('click', () => {
+        try {
+          localStorage.removeItem(HISTORY_KEY);
+        } catch (_) {
+          /* ignore */
+        }
+        renderHistory();
+        toast('History cleared.', 'info');
+      });
+
+      // Routing ------------------------------------------------------
+      window.addEventListener('hashchange', handleHash);
+    }
+
+    /* ==================================================================
+       27. Bootstrap
+       ================================================================== */
+    function init() {
+      bindCodeInputs();
+      bindEvents();
+
+      renderSelectedFiles();
+      renderReceivedFiles();
+      renderHistory();
+      showView('dashboard');
+
+      if (!SUPPORTS_RTC || !SUPPORTS_BUS) {
+        toast(
+          'This browser does not support direct peer connections between tabs.',
+          'error'
+        );
+      }
+
+      handleHash();
+    }
+
+    if (document.readyState === 'loading') {
+      document.addEventListener('DOMContentLoaded', init, { once: true });
+    } else {
+      init();
+    }
+  })();
+  </script>
+</body>
+</html>
