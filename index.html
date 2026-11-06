@@ -4122,14 +4122,15 @@ const hasSessionData =
   });
 });
 
-// History back button should simply return home.
-const historyBackButton = $('#view-history .back-btn');
+// History back button
+document.addEventListener('click', (event) => {
+  const backButton = event.target.closest('#view-history .back-btn');
 
-if (historyBackButton) {
-  historyBackButton.addEventListener('click', () => {
-    showView('dashboard');
-  });
-}
+  if (!backButton) return;
+
+  event.preventDefault();
+  showView('dashboard');
+});
 
       // Send view: file picking --------------------------------------
       const dropZone = $('drop-zone');
