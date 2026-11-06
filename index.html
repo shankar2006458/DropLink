@@ -312,6 +312,20 @@
     .panel-gap { margin-top: clamp(18px, 4vw, 28px); }
 
     .view { animation: rise 0.36s ease both; }
+
+    /* Keep auto-scrolled sections below the top navigation */
+#view-send,
+#view-receive {
+  scroll-margin-top: 90px;
+}
+
+#selected-wrap,
+#room-wrap,
+#send-progress,
+#receive-progress,
+#receive-files {
+  scroll-margin-top: 90px;
+}
     @keyframes rise {
       from { opacity: 0; transform: translateY(10px); }
       to   { opacity: 1; transform: translateY(0); }
@@ -640,13 +654,91 @@
       overflow: hidden;
     }
 
-    .progress-fill {
-      width: 0%;
-      height: 100%;
-      border-radius: 999px;
-      background: linear-gradient(90deg, #8dbca5, var(--accent));
-      transition: width 0.14s linear;
-    }
+.progress-fill {
+  width: 0%;
+  height: 100%;
+  border-radius: 999px;
+  position: relative;
+  overflow: hidden;
+  background: linear-gradient(90deg, #8dbca5, var(--accent));
+  transition: width 0.35s ease;
+}
+
+/* Smooth red overlay */
+.progress-fill::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  background: linear-gradient(90deg, #e05252, #ff7777);
+  opacity: 0;
+  transition: opacity 0.4s ease;
+  box-shadow: 0 0 12px rgba(255, 85, 85, 0.35);
+}
+
+.progress-fill.is-paused::after {
+  opacity: 1;
+}
+
+/* Smooth status message transitions */
+.status-line {
+  transition:
+    color 0.35s ease,
+    background-color 0.35s ease,
+    border-color 0.35s ease,
+    box-shadow 0.35s ease,
+    padding 0.35s ease,
+    transform 0.35s ease;
+}
+
+.status-line.is-paused,
+.status-line.is-resumed {
+  display: block;
+  padding: 11px 14px;
+  border-radius: 12px;
+  font-weight: 600;
+  line-height: 1.5;
+  transform: translateY(0);
+}
+
+.status-line.is-paused {
+  color: #ff9999;
+  background: rgba(255, 75, 75, 0.11);
+  border: 1px solid rgba(255, 95, 95, 0.3);
+  box-shadow: inset 3px 0 0 #f05b5b;
+}
+
+.status-line.is-resumed {
+  color: #b9e976;
+  background: rgba(185, 233, 118, 0.09);
+  border: 1px solid rgba(185, 233, 118, 0.25);
+  box-shadow: inset 3px 0 0 #b9e976;
+}
+
+/* Smooth Resume button */
+#pause-send {
+  transition:
+    background-color 0.35s ease,
+    color 0.35s ease,
+    border-color 0.35s ease,
+    box-shadow 0.35s ease,
+    transform 0.2s ease;
+}
+
+#pause-send.is-paused {
+  background: #e05252;
+  color: #ffffff;
+  border-color: #e05252;
+  box-shadow: 0 4px 14px rgba(224, 82, 82, 0.2);
+}
+
+#pause-send.is-paused:hover:not(:disabled) {
+  background: #f06464;
+}
+
+#pause-send:active:not(:disabled) {
+  transform: scale(0.97);
+}
 
     .metrics {
       margin-top: 12px;
@@ -1386,10 +1478,19 @@
           </div>
 
           <!-- Actions -->
-          <div id="sender-actions" class="btn-row" hidden>
-            <button type="button" id="cancel-send" class="btn btn-ghost btn-sm">Cancel transfer</button>
-            <button type="button" id="retry-send" class="btn btn-ghost btn-sm" hidden>Retry connection</button>
-          </div>
+<div id="sender-actions" class="btn-row" hidden>
+  <button type="button" id="pause-send" class="btn btn-primary btn-sm" disabled>
+    Pause transfer
+  </button>
+
+  <button type="button" id="cancel-send" class="btn btn-ghost btn-sm">
+    Cancel transfer
+  </button>
+
+  <button type="button" id="retry-send" class="btn btn-ghost btn-sm" hidden>
+    Retry connection
+  </button>
+</div>
         </div>
       </section>
 
@@ -1718,6 +1819,10 @@
       sendCompleted: 0,
       sending: false,
 
+      // Pause / Resume
+      paused: false,
+      pauseResolver: null,
+
       // receiver
       expectedFiles: 0,
       completedFiles: 0,
@@ -1822,8 +1927,36 @@ let pendingConfirmAction = null;
       let line = null;
       if (state.role === 'sender') line = $('sender-status');
       else if (state.role === 'receiver') line = $('receiver-status');
-      if (line) line.textContent = text;
+      if (line) {
+  line.textContent = text;
+  line.classList.remove('is-paused', 'is-resumed');
+}
     }
+
+    function updateTransferPauseUI(paused) {
+  const status = state.role === 'sender'
+    ? $('sender-status')
+    : $('receiver-status');
+
+  const bar = state.role === 'sender'
+    ? $('send-bar')
+    : $('receive-bar');
+
+  const button = $('pause-send');
+
+  if (status) {
+    status.classList.toggle('is-paused', paused);
+    status.classList.toggle('is-resumed', !paused);
+  }
+
+  if (bar) {
+    bar.classList.toggle('is-paused', paused);
+  }
+
+if (button && state.role === 'sender') {
+  button.classList.toggle('is-paused', paused);
+}
+}
 
     /* ==================================================================
        8. History
@@ -2203,12 +2336,28 @@ if (requestModal && requestModal.open) {
     /**
      * Terminates the current transfer, updates the UI and records history.
      */
-    function endTransfer(message, status, toastType) {
-      if (!state.active) return;
+function endTransfer(message, status, toastType) {
+  if (!state.active) return;
 
-      const direction = state.role;
-      closeConnection();
-      setStatus(message);
+  const direction = state.role;
+
+  // Release any pending pause before closing the connection.
+  state.paused = false;
+  state.sending = false;
+
+  if (state.pauseResolver) {
+    const resolve = state.pauseResolver;
+    state.pauseResolver = null;
+    resolve();
+  }
+
+  if ($('pause-send')) {
+    $('pause-send').disabled = true;
+    $('pause-send').textContent = 'Pause transfer';
+  }
+
+  closeConnection();
+  setStatus(message);
 
       if (message) toast(message, toastType || (status === 'Completed' ? 'success' : 'info'));
       addHistory(direction, status);
@@ -2343,6 +2492,38 @@ if (role === 'receiver') {
 }
 }
 
+// Smoothly scroll to an important section.
+function smoothScrollTo(element, delay = 250) {
+  if (!element) return;
+
+  window.setTimeout(() => {
+    // Do not scroll to an element that is hidden.
+    if (!element.isConnected || element.getClientRects().length === 0) {
+      return;
+    }
+
+    requestAnimationFrame(() => {
+      requestAnimationFrame(() => {
+        const header = document.querySelector('.site-header');
+        const headerHeight = header
+          ? header.getBoundingClientRect().height
+          : 0;
+
+        const elementTop =
+          element.getBoundingClientRect().top + window.scrollY;
+
+        const targetPosition =
+          elementTop - headerHeight - 18;
+
+        window.scrollTo({
+          top: Math.max(0, targetPosition),
+          behavior: 'smooth'
+        });
+      });
+    });
+  }, delay);
+}
+
     /* ==================================================================
        12. Reset / cleanup
        ================================================================== */
@@ -2364,6 +2545,20 @@ if (role === 'receiver') {
       state.channel = null;
       state.bus = null;
       state.sending = false;
+state.paused = false;
+
+// Release the sender if the transfer is being reset while paused.
+if (state.pauseResolver) {
+  const resolve = state.pauseResolver;
+  state.pauseResolver = null;
+  resolve();
+}
+
+// Restore the Pause button.
+if ($('pause-send')) {
+  $('pause-send').disabled = true;
+  $('pause-send').textContent = 'Pause transfer';
+}
 
       state.totalBytes = 0;
       state.bytesDone = 0;
@@ -2381,8 +2576,17 @@ if (role === 'receiver') {
 
       $('send-progress').hidden = true;
       $('receive-progress').hidden = true;
-      $('send-bar').style.width = '0%';
-      $('receive-bar').style.width = '0%';
+$('send-bar').style.width = '0%';
+$('receive-bar').style.width = '0%';
+
+// Clear old pause/resume styling.
+$('send-bar').classList.remove('is-paused', 'is-resumed');
+$('receive-bar').classList.remove('is-paused', 'is-resumed');
+
+$('sender-status').classList.remove('is-paused', 'is-resumed');
+$('receiver-status').classList.remove('is-paused', 'is-resumed');
+
+$('pause-send').classList.remove('is-paused');
       $('send-current').textContent = '';
       $('receive-current').textContent = '';
       $('send-metrics').textContent = '';
@@ -2496,7 +2700,14 @@ function renderProgress(kind) {
       const bar = isSend ? $('send-bar') : $('receive-bar');
       const metrics = isSend ? $('send-metrics') : $('receive-metrics');
 
-      if (panel) panel.hidden = false;
+      const wasHidden = panel ? panel.hidden : true;
+
+if (panel) panel.hidden = false;
+
+// Scroll only when the progress section first appears.
+if (wasHidden) {
+  smoothScrollTo(panel);
+}
       if (bar) bar.style.width = `${pct.toFixed(2)}%`;
       if (metrics) {
         metrics.textContent = [
@@ -2592,6 +2803,10 @@ function renderProgress(kind) {
 
       renderSelectedFiles();
 
+if (added > 0) {
+  smoothScrollTo($('selected-wrap'));
+}
+
       if (added > 0) {
         toast(`Added ${added} file${added === 1 ? '' : 's'}.`, 'success');
       } else if (skipped > 0) {
@@ -2614,6 +2829,11 @@ function renderProgress(kind) {
         return;
       }
       wrap.hidden = false;
+
+      // Scroll only when the first received file appears.
+if (state.receivedList.length === 1) {
+  smoothScrollTo(wrap);
+}
 
       state.receivedList.forEach((item) => {
         const row = document.createElement('div');
@@ -2693,6 +2913,7 @@ function renderProgress(kind) {
 
       openBus(state.room);
       renderRoomPanel();
+      smoothScrollTo($('room-wrap'));
 
       $('sender-actions').hidden = false;
       renderSelectedFiles();
@@ -2880,24 +3101,31 @@ ctx.fillStyle = '#b9e976';
 ctx.font = '21px Arial';
 
 ctx.fillText(
-  state.pc ? 'No expiry while connected' : expiresAt.toLocaleTimeString('en-IN'),
+  state.pc
+    ? 'No expiry while connected'
+    : expiresAt.toLocaleTimeString('en-IN'),
   650, 1310
 );
-
-    ctx.fillText(
-      expiresAt.toLocaleTimeString('en-IN'),
-      650, 1310
-    );
 
     // Instructions.
     ctx.textAlign = 'center';
     ctx.fillStyle = '#a9b7b7';
     ctx.font = '22px Arial';
 
-    ctx.fillText(
-      'Scan the QR code or enter the six-digit code manually.',
-      600, 1380
-    );
+ctx.fillText(
+  'Scan the QR code or enter the six-digit code manually.',
+  600, 1370
+);
+
+// Developer footer.
+ctx.textAlign = 'center';
+ctx.fillStyle = '#71828a';
+ctx.font = '18px Arial';
+
+ctx.fillText(
+  'DEVELOPED BY  ~  SHANKAR PRASAD PYKE',
+  600, 1408
+);
 
     // Download.
     const imageURL = canvas.toDataURL('image/png');
@@ -3352,6 +3580,65 @@ to: state.remotePeerId
       }
     }
 
+    // Wait here while the sender has paused the transfer.
+function waitWhilePaused() {
+  if (!state.paused || !state.active) {
+    return Promise.resolve();
+  }
+
+  return new Promise((resolve) => {
+    state.pauseResolver = resolve;
+  });
+}
+
+// Toggle transfer between paused and running states.
+function toggleTransferPause() {
+  if (
+    !state.active ||
+    state.role !== 'sender' ||
+    !state.sending
+  ) {
+    return;
+  }
+
+  state.paused = !state.paused;
+
+  const button = $('pause-send');
+
+  if (state.paused) {
+    button.textContent = 'Resume transfer';
+
+    sendMeta({
+      kind: 'pause',
+      paused: true
+    });
+
+    setStatus('Transfer paused. Your files are safe. Resume whenever you are ready.', true);
+    updateTransferPauseUI(true);
+
+    toast('Transfer paused.', 'info');
+
+  } else {
+    button.textContent = 'Pause transfer';
+
+    sendMeta({
+      kind: 'pause',
+      paused: false
+    });
+
+    setStatus('Transfer resumed. Files are being sent again.', true);
+    updateTransferPauseUI(false);
+
+    toast('Transfer resumed.', 'success');
+
+    if (state.pauseResolver) {
+      const resolve = state.pauseResolver;
+      state.pauseResolver = null;
+      resolve();
+    }
+  }
+}
+
     function waitForDrain() {
       return new Promise((resolve, reject) => {
         const channel = state.channel;
@@ -3393,8 +3680,13 @@ to: state.remotePeerId
     async function sendFiles() {
       const files = state.files;
 
-      state.sending = true;
-      state.totalBytes = files.reduce((sum, file) => sum + file.size, 0);
+state.sending = true;
+state.paused = false;
+
+$('pause-send').disabled = false;
+$('pause-send').textContent = 'Pause transfer';
+
+state.totalBytes = files.reduce((sum, file) => sum + file.size, 0);
       state.bytesDone = 0;
       state.sendCompleted = 0;
       state.startedAt = performance.now();
@@ -3417,39 +3709,63 @@ to: state.remotePeerId
           `${file.name} · file ${index + 1} of ${files.length}`;
         scheduleProgress('send');
 
-        for (let offset = 0; offset < file.size; offset += CHUNK_SIZE) {
-          if (!state.active) return;
+for (let offset = 0; offset < file.size; offset += CHUNK_SIZE) {
+  if (!state.active) return;
 
-          await waitForDrain();
+  await waitWhilePaused();
+
+  if (!state.active) return;
+
+  await waitForDrain();
+
+  await waitWhilePaused();
+
+  if (!state.active) return;
 
           if (!state.active || !state.channel || state.channel.readyState !== 'open') {
             throw new Error('Channel closed');
           }
 
-          const buffer = await file.slice(offset, offset + CHUNK_SIZE).arrayBuffer();
+const buffer = await file.slice(offset, offset + CHUNK_SIZE).arrayBuffer();
 
-          if (!state.active || !state.channel || state.channel.readyState !== 'open') {
-            throw new Error('Channel closed');
-          }
+// Check again in case the sender paused while the chunk was loading.
+await waitWhilePaused();
 
-          state.channel.send(buffer);
+if (!state.active) return;
+
+if (!state.channel || state.channel.readyState !== 'open') {
+  throw new Error('Channel closed');
+}
+
+state.channel.send(buffer);
           state.bytesDone += buffer.byteLength;
           scheduleProgress('send');
         }
 
-        await waitForDrain();
-        if (!state.active) return;
+await waitForDrain();
 
-        sendMeta({ kind: 'end', index });
-      }
+await waitWhilePaused();
 
-      await waitForDrain();
-      if (!state.active) return;
+if (!state.active) return;
 
-      sendMeta({ kind: 'done' });
-      state.sending = false;
+sendMeta({ kind: 'end', index });
+}
 
-      setStatus('All files sent — waiting for the receiver to confirm…', true);
+await waitForDrain();
+
+await waitWhilePaused();
+
+if (!state.active) return;
+
+sendMeta({ kind: 'done' });
+
+state.sending = false;
+state.paused = false;
+
+$('pause-send').disabled = true;
+$('pause-send').textContent = 'Pause transfer';
+
+setStatus('All files sent — waiting for the receiver to confirm…', true);
     }
 
     function handleSenderMessage(data) {
@@ -3556,8 +3872,21 @@ function showCompletionModal(direction, count, totalBytes) {
         return;
       }
 
-      switch (message.kind) {
-        case 'manifest': {
+switch (message.kind) {
+
+case 'pause': {
+  if (message.paused === true) {
+    setStatus('The sender has paused the transfer. Waiting for them to resume.', true);
+    updateTransferPauseUI(true);
+  } else {
+    setStatus('The sender has resumed the transfer. Receiving files again.', true);
+    updateTransferPauseUI(false);
+  }
+
+  break;
+}
+
+  case 'manifest': {
           const valid = Number.isInteger(message.count)
             && message.count >= 1
             && Number.isSafeInteger(message.total)
@@ -3574,12 +3903,12 @@ function showCompletionModal(direction, count, totalBytes) {
           state.receivedBytes = 0;
           state.startedAt = performance.now();
 
-          setStatus(
-            `Receiving ${message.count} file${message.count === 1 ? '' : 's'}…`,
-            true
-          );
-          $('receive-progress').hidden = false;
-          scheduleProgress('receive');
+setStatus(
+  `Receiving ${message.count} file${message.count === 1 ? '' : 's'}…`,
+  true
+);
+
+scheduleProgress('receive');
           break;
         }
 
@@ -3726,7 +4055,7 @@ function showCompletionModal(direction, count, totalBytes) {
 
       state.role = 'receiver';
       state.room = code;
-      state.active = true;
+state.active = true;
 
 openBus(code);
 
@@ -3738,6 +4067,8 @@ state.connectionRequestId =
 $('receiver-actions').hidden = false;
 
 setStatus('Waiting for the sender to approve your connection…');
+
+smoothScrollTo($('receiver-status'));
 
 signal({
   type: 'connection_request',
@@ -4214,8 +4545,10 @@ $('clear-files').addEventListener('click', () => {
     onConfirm: createRoom
   });
 });
-      $('cancel-send').addEventListener('click', openCancelModal);
-      $('retry-send').addEventListener('click', createRoom);
+$('pause-send').addEventListener('click', toggleTransferPause);
+
+$('cancel-send').addEventListener('click', openCancelModal);
+$('retry-send').addEventListener('click', createRoom);
 
       // Receive view -------------------------------------------------
 $('join-form').addEventListener('submit', (event) => {
