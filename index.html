@@ -12,6 +12,7 @@
     href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Fraunces:opsz,wght@9..144,600&display=swap"
     rel="stylesheet">
   <script src="https://cdn.jsdelivr.net/npm/qrcodejs@1.0.0/qrcode.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/jsqr@1.4.0/dist/jsQR.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <script>
     const SUPABASE_URL = "https://ioldowzsooouvxxczjcg.supabase.co";
@@ -688,6 +689,159 @@
       box-shadow: 0 0 0 4px rgba(185, 233, 118, 0.14);
     }
 
+    /* ==================================================================
+       QR scanner
+       ================================================================== */
+    .or-divider {
+      display: flex;
+      align-items: center;
+      gap: 14px;
+      margin: 18px 0 20px;
+      color: var(--muted);
+      font-size: 12px;
+      font-weight: 600;
+      letter-spacing: 0.12em;
+      text-transform: uppercase;
+    }
+    .or-divider::before,
+    .or-divider::after {
+      content: "";
+      flex: 1 1 auto;
+      height: 1px;
+      background: var(--line);
+    }
+
+    .scanner-modal {
+      width: min(480px, calc(100% - 24px));
+      padding: 0;
+      border: 1px solid var(--line-strong);
+      border-radius: 22px;
+      background: #151d25;
+      color: var(--ink);
+      box-shadow: 0 28px 90px rgba(0, 0, 0, 0.55);
+      overflow: hidden;
+      max-height: 92vh;
+      overflow-y: auto;
+      opacity: 0;
+      transform: translateY(14px) scale(0.96);
+      transition: opacity 0.24s ease, transform 0.24s ease,
+                  overlay 0.24s allow-discrete, display 0.24s allow-discrete;
+    }
+    .scanner-modal[open] {
+      opacity: 1;
+      transform: translateY(0) scale(1);
+    }
+    .scanner-modal::backdrop {
+      background: rgba(0, 0, 0, 0.68);
+      backdrop-filter: blur(5px);
+      -webkit-backdrop-filter: blur(5px);
+      transition: background 0.24s ease;
+    }
+    @starting-style {
+      .scanner-modal[open] {
+        opacity: 0;
+        transform: translateY(14px) scale(0.96);
+      }
+      .scanner-modal[open]::backdrop {
+        background: rgba(0, 0, 0, 0);
+      }
+    }
+
+    .scanner-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      padding: 16px 20px;
+      border-bottom: 1px solid var(--line);
+    }
+    .scanner-header h2 {
+      font-size: 17px;
+      font-weight: 700;
+      letter-spacing: -0.01em;
+    }
+    .scanner-close {
+      display: grid;
+      place-items: center;
+      width: 32px; height: 32px;
+      padding: 0;
+      border-radius: 50%;
+      border: 1px solid var(--line);
+      background: rgba(255,255,255,0.04);
+      color: var(--ink);
+      cursor: pointer;
+      transition: background 0.18s ease;
+    }
+    .scanner-close:hover { background: rgba(255,255,255,0.1); }
+
+    .scanner-body { padding: 18px 20px 22px; }
+
+    .scanner-viewport {
+      position: relative;
+      width: 100%;
+      aspect-ratio: 1 / 1;
+      max-height: 62vh;
+      border-radius: var(--radius-lg);
+      overflow: hidden;
+      background: #000;
+    }
+    .scanner-viewport video {
+      position: absolute;
+      inset: 0;
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+    }
+
+    .scanner-frame {
+      position: absolute;
+      inset: 0;
+      display: grid;
+      place-items: center;
+      pointer-events: none;
+    }
+    .scanner-frame::before {
+      content: "";
+      width: 68%;
+      aspect-ratio: 1 / 1;
+      border-radius: 18px;
+      border: 2px solid rgba(185, 233, 118, 0.55);
+      box-shadow: 0 0 0 9999px rgba(0, 0, 0, 0.45);
+    }
+    .scanner-frame::after {
+      content: "";
+      position: absolute;
+      left: 16%;
+      right: 16%;
+      top: 50%;
+      height: 2px;
+      background: linear-gradient(90deg, transparent, var(--accent), transparent);
+      box-shadow: 0 0 12px rgba(185, 233, 118, 0.6);
+      animation: scan-sweep 2s ease-in-out infinite;
+    }
+    @keyframes scan-sweep {
+      0%   { transform: translateY(-70px); opacity: 0.2; }
+      50%  { transform: translateY(70px);  opacity: 1;   }
+      100% { transform: translateY(-70px); opacity: 0.2; }
+    }
+
+    .scanner-help {
+      margin-top: 14px;
+      font-size: 13.5px;
+      color: var(--muted);
+      text-align: center;
+      line-height: 1.55;
+    }
+    .scanner-error {
+      margin-top: 14px;
+      padding: 12px 14px;
+      font-size: 13.5px;
+      color: var(--danger);
+      background: rgba(255, 157, 157, 0.08);
+      border: 1px solid rgba(255, 157, 157, 0.25);
+      border-radius: var(--radius-md);
+    }
+
     .note {
       padding: 14px 16px;
       margin-bottom: 24px;
@@ -1194,10 +1348,27 @@
                 <p class="label">Connection code</p>
                 <p id="room-code" class="room-code" aria-live="polite"></p>
                 <p id="room-expiry" class="muted small" style="margin-top: 8px;"></p>
-                <div class="btn-row">
-                  <button type="button" id="copy-code" class="btn btn-ghost btn-sm">Copy code</button>
-                  <button type="button" id="copy-link" class="btn btn-ghost btn-sm">Copy link</button>
-                </div>
+<div class="btn-row">
+  <button type="button" id="copy-code" class="btn btn-ghost btn-sm">
+    Copy code
+  </button>
+
+  <button type="button" id="copy-link" class="btn btn-ghost btn-sm">
+    Copy link
+  </button>
+
+  <button type="button" id="download-qr" class="btn btn-primary btn-sm">
+    <svg viewBox="0 0 24 24" width="16" height="16"
+         fill="none" stroke="currentColor" stroke-width="2"
+         stroke-linecap="round" stroke-linejoin="round"
+         aria-hidden="true">
+      <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+      <path d="m7 10 5 5 5-5"/>
+      <path d="M12 15V3"/>
+    </svg>
+    Download QR
+  </button>
+</div>
                 <p id="sender-status" class="status-line" role="status"></p>
               </div>
             </div>
@@ -1230,9 +1401,23 @@
 
         <div class="card panel panel-gap">
           <p class="note">
-            Camera scanning isn't available here — type the code, or open the sender's link
-            in another tab of this browser.
+            Scan the sender's QR code with your camera, type the six-digit code,
+            or open the sender's link in another tab of this browser.
           </p>
+
+          <button type="button" id="scan-qr-btn" class="btn btn-ghost" style="width: 100%;">
+            <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor"
+                 stroke-width="2.1" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+              <path d="M3 7V5a2 2 0 0 1 2-2h2"></path>
+              <path d="M17 3h2a2 2 0 0 1 2 2v2"></path>
+              <path d="M21 17v2a2 2 0 0 1-2 2h-2"></path>
+              <path d="M7 21H5a2 2 0 0 1-2-2v-2"></path>
+              <path d="M7 12h10"></path>
+            </svg>
+            Scan QR code with camera
+          </button>
+
+          <div class="or-divider"><span>or enter code manually</span></div>
 
           <form id="join-form" autocomplete="off" novalidate>
             <span class="label" id="code-label">Connection code</span>
@@ -1371,6 +1556,43 @@
   </div>
 </dialog>
 
+<!-- Incoming Connection Request Modal -->
+<dialog id="connection-request-modal" class="cancel-modal">
+  <div class="cancel-modal-content">
+
+    <div class="cancel-modal-icon">
+      <svg viewBox="0 0 24 24" width="27" height="27"
+           fill="none" stroke="currentColor" stroke-width="1.8"
+           stroke-linecap="round" stroke-linejoin="round">
+        <rect x="3" y="4" width="18" height="16" rx="2"></rect>
+        <path d="M8 20v-4h8v4"></path>
+        <path d="M8 9h8"></path>
+      </svg>
+    </div>
+
+    <h2>Connection Request</h2>
+
+    <p id="connection-request-device">
+      A device wants to connect to your DropLink room.
+    </p>
+
+    <p>Do you want to allow this device to receive your selected files?</p>
+
+    <div class="cancel-modal-actions">
+      <button type="button" id="reject-connection"
+              class="btn btn-ghost">
+        Reject
+      </button>
+
+      <button type="button" id="accept-connection"
+              class="btn btn-primary">
+        Accept
+      </button>
+    </div>
+
+  </div>
+</dialog>
+
 <!-- Transfer Completion Modal -->
 <dialog id="complete-modal" class="cancel-modal complete-modal">
   <div class="cancel-modal-content">
@@ -1407,6 +1629,31 @@
   </div>
 </dialog>
 
+<!-- QR Scanner Modal -->
+<dialog id="scanner-modal" class="scanner-modal">
+  <div class="scanner-header">
+    <h2>Scan QR code</h2>
+    <button type="button" id="scanner-close" class="scanner-close" aria-label="Close scanner">
+      <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor"
+           stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M18 6 6 18"></path>
+        <path d="m6 6 12 12"></path>
+      </svg>
+    </button>
+  </div>
+
+  <div class="scanner-body">
+    <div class="scanner-viewport">
+      <video id="scanner-video" playsinline muted autoplay></video>
+      <div class="scanner-frame" aria-hidden="true"></div>
+    </div>
+    <p id="scanner-help" class="scanner-help">
+      Point your camera at the sender's QR code — the code fills in and connects automatically.
+    </p>
+    <p id="scanner-error" class="scanner-error" hidden></p>
+  </div>
+</dialog>
+
 
   <script>
   (() => {
@@ -1420,7 +1667,7 @@
     const LOW_WATER       = 256 * 1024;         // resume when buffer drops below this
     const BUFFER_TIMEOUT  = 20000;              // ms to wait for the buffer to drain
     const ROOM_TTL        = 10 * 60 * 1000;     // room lifetime, 10 minutes
-    const JOIN_TIMEOUT    = 12000;              // ms to wait for a sender to answer
+    const JOIN_TIMEOUT    = 60000;              // ms to wait for a sender to answer
     const HISTORY_KEY     = 'droplink.history.v1';
     const HISTORY_LIMIT   = 30;
     const TOAST_LIFETIME  = 4200;
@@ -1450,7 +1697,13 @@
       room: '',
       roomStartedAt: 0,
       active: false,
-      session: 0,                 // bumped whenever a new session starts
+      session: 0,
+
+      // Connection approval
+      remotePeerId: null,
+      connectionRequestId: null,
+      pendingRequestId: null,
+      pendingReceiverId: null,                 // bumped whenever a new session starts
 
       // transport
       pc: null,
@@ -1710,14 +1963,19 @@ function createBus(room, onMessage) {
       }
     }
 
-    if (
-      status === 'CHANNEL_ERROR' ||
-      status === 'TIMED_OUT' ||
-      status === 'CLOSED'
-    ) {
-      console.error('Supabase channel error:', status);
-      resolveReady(false);
-    }
+if (status === 'CLOSED') {
+  // Ignore CLOSED when the app intentionally removes the channel.
+  if (closed) return;
+
+  console.warn('Supabase channel closed unexpectedly.');
+  resolveReady(false);
+  return;
+}
+
+if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT') {
+  console.error('Supabase channel error:', status);
+  resolveReady(false);
+}
   });
 
   return {
@@ -1794,6 +2052,101 @@ function createBus(room, onMessage) {
       state.bus = createBus(room, handleSignal);
     }
 
+    function getDeviceLabel() {
+  const ua = navigator.userAgent;
+
+  let device = 'Unknown device';
+  let browser = 'Unknown browser';
+
+  if (/Android/i.test(ua)) {
+    device = 'Android device';
+  } else if (/iPhone|iPad|iPod/i.test(ua)) {
+    device = 'Apple device';
+  } else if (/Windows/i.test(ua)) {
+    device = 'Windows PC';
+  } else if (/Macintosh|Mac OS/i.test(ua)) {
+    device = 'Mac';
+  } else if (/Linux/i.test(ua)) {
+    device = 'Linux device';
+  }
+
+  if (/Edg/i.test(ua)) {
+    browser = 'Microsoft Edge';
+  } else if (/Chrome/i.test(ua) && !/Edg/i.test(ua)) {
+    browser = 'Google Chrome';
+  } else if (/Firefox/i.test(ua)) {
+    browser = 'Firefox';
+  } else if (/Safari/i.test(ua) && !/Chrome/i.test(ua)) {
+    browser = 'Safari';
+  }
+
+  return `${device} • ${browser}`;
+}
+
+function acceptConnectionRequest() {
+  if (
+    !state.active ||
+    state.role !== 'sender' ||
+    !state.pendingRequestId ||
+    !state.pendingReceiverId
+  ) {
+    return;
+  }
+
+  const requestId = state.pendingRequestId;
+  const receiverId = state.pendingReceiverId;
+
+  state.remotePeerId = receiverId;
+  state.connectionRequestId = requestId;
+
+  window.clearTimeout(joinTimer);
+
+  $('connection-request-modal').close();
+
+  signal({
+    type: 'request_accepted',
+    requestId,
+    to: receiverId
+  });
+
+  state.pendingRequestId = null;
+  state.pendingReceiverId = null;
+
+  setStatus('Request accepted. Establishing direct connection…');
+
+  startOffer().catch(() => {
+    failTransfer('Could not start the direct connection. Please retry.');
+  });
+}
+
+function rejectConnectionRequest() {
+  if (
+    !state.active ||
+    state.role !== 'sender' ||
+    !state.pendingRequestId ||
+    !state.pendingReceiverId
+  ) {
+    $('connection-request-modal').close();
+    return;
+  }
+
+  const requestId = state.pendingRequestId;
+  const receiverId = state.pendingReceiverId;
+
+  $('connection-request-modal').close();
+
+  signal({
+    type: 'request_rejected',
+    requestId,
+    to: receiverId
+  });
+
+  state.pendingRequestId = null;
+  state.pendingReceiverId = null;
+
+  setStatus('Connection request rejected. Waiting for another receiver…');
+}
+
     /* ==================================================================
        10. Timers
        ================================================================== */
@@ -1812,8 +2165,19 @@ function createBus(room, onMessage) {
        11. Connection lifecycle
        ================================================================== */
 function closeConnection() {
-  state.active = false;
-  clearTimers();
+state.active = false;
+clearTimers();
+
+state.remotePeerId = null;
+state.connectionRequestId = null;
+state.pendingRequestId = null;
+state.pendingReceiverId = null;
+
+const requestModal = $('connection-request-modal');
+
+if (requestModal && requestModal.open) {
+  requestModal.close();
+}
 
   // Cancel any pending progress-bar animation.
   if (progressFrame) {
@@ -2028,7 +2392,78 @@ if (role === 'receiver') {
       $('retry-receive').hidden = true;
       $('sender-actions').hidden = true;
       $('receiver-actions').hidden = true;
+      
     }
+
+    // Clear all session data and return to home.
+async function clearSessionAndGoHome() {
+
+  const currentBus = state.bus;
+  const currentRoom = state.room;
+
+  // Notify the other device before disconnecting.
+  if (state.active && currentBus && currentRoom) {
+    try {
+      await currentBus.postAndWait({
+        type: 'disconnect',
+        from: TAB_ID,
+        room: currentRoom
+      });
+    } catch (error) {
+      console.error('Disconnect notification failed:', error);
+    }
+  }
+
+  // Disconnect and reset transfer state.
+  resetTransfer();
+
+  // Clear selected files.
+  state.files = [];
+  $('file-input').value = '';
+  renderSelectedFiles();
+
+  // Clear downloaded/received files and revoke their URLs.
+  clearReceivedFiles();
+
+  // Clear receiver connection code.
+  codeInputs.forEach((input) => {
+    input.value = '';
+  });
+
+  // Clear room and QR information.
+  $('room-wrap').hidden = true;
+  $('qr').replaceChildren();
+  $('room-code').textContent = '';
+  $('room-expiry').textContent = '';
+
+  // Hide all previous transfer sections.
+  $('selected-wrap').hidden = true;
+  $('receive-files').hidden = true;
+  $('send-progress').hidden = true;
+  $('receive-progress').hidden = true;
+  $('sender-actions').hidden = true;
+  $('receiver-actions').hidden = true;
+
+  // Reset session information.
+  state.role = null;
+  state.room = '';
+  state.roomStartedAt = 0;
+
+  // Remove old room code from URL.
+  history.replaceState(
+    null,
+    '',
+    window.location.pathname + window.location.search
+  );
+
+  // Update connection status.
+  setStatus('Not connected');
+
+  // Return to home.
+  showView('dashboard');
+
+  toast('Session cleared successfully.', 'success');
+}
 
     /* ==================================================================
        13. Progress rendering (throttled with requestAnimationFrame)
@@ -2297,9 +2732,189 @@ function renderProgress(kind) {
         qrHost.textContent = 'QR unavailable — share the code instead.';
       }
 
-      $('copy-code').onclick = () => copyText(state.room, 'Connection code copied.');
-      $('copy-link').onclick = () => copyText(buildRoomLink(state.room), 'Connection link copied.');
+$('copy-code').onclick = () =>
+  copyText(state.room, 'Connection code copied.');
+
+$('copy-link').onclick = () =>
+  copyText(buildRoomLink(state.room), 'Connection link copied.');
+
+$('download-qr').onclick = downloadRoomCard;
     }
+
+    
+async function downloadRoomCard() {
+  if (!state.active || !state.room || !state.roomStartedAt) {
+    toast('No active connection room found.', 'error');
+    return;
+  }
+
+  if (!window.QRCode) {
+    toast('QR generator is unavailable.', 'error');
+    return;
+  }
+
+  try {
+    const roomCode = state.room;
+    const roomLink = buildRoomLink(roomCode);
+
+    const createdAt = new Date(state.roomStartedAt);
+    const expiresAt = new Date(state.roomStartedAt + ROOM_TTL);
+
+    // Generate a separate high-resolution QR code.
+    const qrContainer = document.createElement('div');
+
+    new window.QRCode(qrContainer, {
+      text: roomLink,
+      width: 420,
+      height: 420,
+      colorDark: '#0a0f14',
+      colorLight: '#ffffff',
+      correctLevel: window.QRCode.CorrectLevel.H
+    });
+
+    const qrCanvas = qrContainer.querySelector('canvas');
+
+    if (!qrCanvas) {
+      throw new Error('Could not generate QR image.');
+    }
+
+    // Create the final downloadable image.
+    const canvas = document.createElement('canvas');
+    canvas.width = 1200;
+    canvas.height = 1500;
+
+    const ctx = canvas.getContext('2d');
+
+    if (!ctx) {
+      throw new Error('Canvas is unavailable.');
+    }
+
+    // Rounded rectangle helper.
+    function roundedRect(x, y, w, h, r, color) {
+      ctx.fillStyle = color;
+      ctx.beginPath();
+      ctx.roundRect(x, y, w, h, r);
+      ctx.fill();
+    }
+
+    // Background.
+    const gradient = ctx.createLinearGradient(0, 0, 1200, 1500);
+    gradient.addColorStop(0, '#101c20');
+    gradient.addColorStop(1, '#0a0f14');
+
+    ctx.fillStyle = gradient;
+    ctx.fillRect(0, 0, 1200, 1500);
+
+    // Main card.
+    roundedRect(55, 55, 1090, 1390, 42, '#151f27');
+
+    // Header branding.
+    ctx.fillStyle = '#b9e976';
+    ctx.font = 'bold 48px Arial';
+    ctx.fillText('DropLink', 110, 160);
+
+    ctx.fillStyle = '#a9b7b7';
+    ctx.font = '24px Arial';
+    ctx.fillText('DIRECT FILE SHARING', 110, 205);
+
+    // Separator.
+    ctx.fillStyle = '#34434a';
+    ctx.fillRect(110, 245, 980, 2);
+
+    // Heading.
+    ctx.fillStyle = '#f1f5f1';
+    ctx.font = 'bold 44px Arial';
+    ctx.fillText('Your connection is ready', 110, 325);
+
+    ctx.fillStyle = '#a9b7b7';
+    ctx.font = '25px Arial';
+    ctx.fillText('Scan the QR code to join the room', 110, 375);
+
+    // QR white background.
+    roundedRect(340, 425, 520, 520, 30, '#ffffff');
+
+    // Draw QR code.
+    ctx.imageSmoothingEnabled = false;
+    ctx.drawImage(qrCanvas, 390, 475, 420, 420);
+    ctx.imageSmoothingEnabled = true;
+
+    // Connection code label.
+    ctx.fillStyle = '#a9b7b7';
+    ctx.font = 'bold 24px Arial';
+    ctx.textAlign = 'center';
+    ctx.fillText('SIX-DIGIT CONNECTION CODE', 600, 1030);
+
+    // Connection code.
+    ctx.fillStyle = '#b9e976';
+    ctx.font = 'bold 100px Arial';
+    ctx.fillText(roomCode, 600, 1145);
+
+    // Date and time information.
+    ctx.textAlign = 'left';
+
+    roundedRect(110, 1200, 470, 125, 18, '#202c34');
+    roundedRect(620, 1200, 470, 125, 18, '#202c34');
+
+    ctx.fillStyle = '#a9b7b7';
+    ctx.font = '21px Arial';
+ctx.fillText('ROOM CREATED', 140, 1240);
+ctx.fillText(
+  state.pc ? 'CONNECTION STATUS' : 'ROOM EXPIRES',
+  650, 1240
+);
+
+    ctx.fillStyle = '#f1f5f1';
+    ctx.font = 'bold 24px Arial';
+
+    ctx.fillText(
+      createdAt.toLocaleDateString('en-IN'),
+      140, 1285
+    );
+
+ctx.fillText(
+  state.pc ? 'Connected' : expiresAt.toLocaleDateString('en-IN'),
+  650, 1285
+);
+
+ctx.fillStyle = '#b9e976';
+ctx.font = '21px Arial';
+
+ctx.fillText(
+  state.pc ? 'No expiry while connected' : expiresAt.toLocaleTimeString('en-IN'),
+  650, 1310
+);
+
+    ctx.fillText(
+      expiresAt.toLocaleTimeString('en-IN'),
+      650, 1310
+    );
+
+    // Instructions.
+    ctx.textAlign = 'center';
+    ctx.fillStyle = '#a9b7b7';
+    ctx.font = '22px Arial';
+
+    ctx.fillText(
+      'Scan the QR code or enter the six-digit code manually.',
+      600, 1380
+    );
+
+    // Download.
+    const imageURL = canvas.toDataURL('image/png');
+
+    triggerDownload(
+      imageURL,
+      `DropLink-Connection-${roomCode}.png`
+    );
+
+    toast('Connection card downloaded successfully.', 'success');
+
+  } catch (error) {
+    console.error('QR card generation failed:', error);
+    toast('Could not download the connection card.', 'error');
+  }
+}
+
 
     function startCountdown() {
       window.clearInterval(countdownTimer);
@@ -2370,7 +2985,12 @@ function renderProgress(kind) {
 
       pc.onicecandidate = (event) => {
         if (event.candidate) {
-          signal({ type: 'ice', candidate: event.candidate.toJSON() });
+          signal({
+  type: 'ice',
+  candidate: event.candidate.toJSON(),
+  requestId: state.connectionRequestId,
+  to: state.remotePeerId
+});
         }
       };
 
@@ -2429,22 +3049,106 @@ function renderProgress(kind) {
        19. Signaling handler
        ================================================================== */
     async function handleSignal(data) {
-      if (!state.active || !data || data.from === TAB_ID || data.room !== state.room) return;
+      if (
+  !state.active ||
+  !data ||
+  data.from === TAB_ID ||
+  data.room !== state.room ||
+  (data.to && data.to !== TAB_ID)
+) return;
 
       try {
         switch (data.type) {
-          case 'hello': {
-            if (state.role !== 'sender' || state.pc) return;
-            if (Date.now() - state.roomStartedAt >= ROOM_TTL) {
-              failTransfer('This room expired. Create a new one.');
-              return;
-            }
-            await startOffer();
-            break;
-          }
+case 'connection_request': {
+  if (state.role !== 'sender') return;
 
-          case 'offer': {
-            if (state.role !== 'receiver' || state.pc) return;
+  if (Date.now() - state.roomStartedAt >= ROOM_TTL) {
+    return;
+  }
+
+  if (state.pc || state.pendingRequestId) {
+    signal({
+      type: 'request_rejected',
+      requestId: data.requestId,
+      to: data.from
+    });
+    return;
+  }
+
+  state.pendingRequestId = data.requestId;
+  state.pendingReceiverId = data.from;
+
+  $('connection-request-device').textContent =
+    `${data.deviceName || 'Unknown device'} wants to connect to your DropLink room.`;
+
+  $('connection-request-modal').showModal();
+
+  setStatus('A device is requesting permission to connect.');
+
+  window.clearTimeout(joinTimer);
+
+  const currentRequestId = data.requestId;
+
+  joinTimer = window.setTimeout(() => {
+    if (state.pendingRequestId !== currentRequestId) return;
+
+    signal({
+      type: 'request_rejected',
+      requestId: currentRequestId,
+      to: state.pendingReceiverId
+    });
+
+    state.pendingRequestId = null;
+    state.pendingReceiverId = null;
+
+    const modal = $('connection-request-modal');
+
+    if (modal.open) modal.close();
+
+    setStatus('Connection request expired. Waiting for another receiver…');
+  }, 55000);
+
+  break;
+}
+
+case 'request_accepted': {
+  if (
+    state.role !== 'receiver' ||
+    data.requestId !== state.connectionRequestId
+  ) return;
+
+  state.remotePeerId = data.from;
+
+  window.clearTimeout(joinTimer);
+
+  setStatus('Sender accepted your request. Connecting…');
+
+  break;
+}
+
+case 'request_rejected': {
+  if (
+    state.role !== 'receiver' ||
+    data.requestId !== state.connectionRequestId
+  ) return;
+
+  state.connectionRequestId = null;
+
+  window.clearTimeout(joinTimer);
+
+  failTransfer('The sender rejected your connection request.');
+
+  break;
+}
+
+case 'offer': {
+  if (
+    state.role !== 'receiver' ||
+    state.pc ||
+    !state.remotePeerId ||
+    data.from !== state.remotePeerId ||
+    data.requestId !== state.connectionRequestId
+  ) return;
             if (Date.now() - (data.createdAt || 0) >= ROOM_TTL) {
               failTransfer('That room expired. Ask the sender for a new code.');
               return;
@@ -2453,17 +3157,28 @@ function renderProgress(kind) {
             break;
           }
 
-          case 'answer': {
-            if (state.role !== 'sender' || !state.pc) return;
+case 'answer': {
+  if (
+    state.role !== 'sender' ||
+    !state.pc ||
+    data.from !== state.remotePeerId ||
+    data.requestId !== state.connectionRequestId
+  ) return;
             await state.pc.setRemoteDescription(data.description);
             await flushPendingIce();
             break;
           }
 
-          case 'ice': {
-            await addRemoteIce(data.candidate);
-            break;
-          }
+case 'ice': {
+  if (
+    !state.remotePeerId ||
+    data.from !== state.remotePeerId ||
+    data.requestId !== state.connectionRequestId
+  ) return;
+
+  await addRemoteIce(data.candidate);
+  break;
+}
 
 case 'disconnect': {
   const disconnectedRole = state.role;
@@ -2566,7 +3281,9 @@ case 'cancel': {
       signal({
         type: 'offer',
         description: state.pc.localDescription,
-        createdAt: state.roomStartedAt
+createdAt: state.roomStartedAt,
+requestId: state.connectionRequestId,
+to: state.remotePeerId
       });
       setStatus('Receiver found — establishing a direct connection…');
     }
@@ -2578,7 +3295,12 @@ case 'cancel': {
 
       const answer = await state.pc.createAnswer();
       await state.pc.setLocalDescription(answer);
-      signal({ type: 'answer', description: state.pc.localDescription });
+      signal({
+  type: 'answer',
+  description: state.pc.localDescription,
+  requestId: state.connectionRequestId,
+  to: state.remotePeerId
+});
 
       setStatus('Connecting to the sender…');
     }
@@ -3006,12 +3728,22 @@ function showCompletionModal(direction, count, totalBytes) {
       state.room = code;
       state.active = true;
 
-      openBus(code);
+openBus(code);
 
-      $('receiver-actions').hidden = false;
-      setStatus('Looking for the sender in another tab…');
+state.connectionRequestId =
+  (typeof crypto !== 'undefined' && crypto.randomUUID)
+    ? crypto.randomUUID()
+    : `request-${Date.now()}-${Math.random().toString(36).slice(2)}`;
 
-      signal({ type: 'hello' });
+$('receiver-actions').hidden = false;
+
+setStatus('Waiting for the sender to approve your connection…');
+
+signal({
+  type: 'connection_request',
+  requestId: state.connectionRequestId,
+  deviceName: getDeviceLabel()
+});
 
       window.clearTimeout(joinTimer);
       joinTimer = window.setTimeout(() => {
@@ -3035,14 +3767,14 @@ function showCompletionModal(direction, count, totalBytes) {
       }
       const nextIndex = Math.min(cursor, codeInputs.length - 1);
       if (codeInputs[nextIndex]) codeInputs[nextIndex].focus();
-      maybeAutoJoin();
+      
     }
 
-    function maybeAutoJoin() {
-      if (!/^\d{6}$/.test(readCodeInputs())) return;
-      window.clearTimeout(autoJoinTimer);
-      autoJoinTimer = window.setTimeout(() => joinRoom(), 240);
-    }
+function maybeAutoJoin() {
+  // Automatic connection disabled.
+  // User must click the Connect button.
+  return;
+}
 
     function bindCodeInputs() {
       codeInputs.forEach((input, index) => {
@@ -3062,7 +3794,7 @@ function showCompletionModal(direction, count, totalBytes) {
           if (index < codeInputs.length - 1) {
             codeInputs[index + 1].focus();
           }
-          maybeAutoJoin();
+          
         });
 
         input.addEventListener('keydown', (event) => {
@@ -3094,6 +3826,243 @@ function showCompletionModal(direction, count, totalBytes) {
       });
     }
 
+
+    /* ==================================================================
+       24b. QR scanner (camera)
+       ================================================================== */
+    const scannerState = {
+      stream: null,
+      rafId: 0,
+      video: null,
+      canvas: null,
+      ctx: null,
+      active: false
+    };
+
+    function showScannerError(message) {
+      const el = $('scanner-error');
+      if (!el) return;
+      if (message) {
+        el.textContent = message;
+        el.hidden = false;
+      } else {
+        el.textContent = '';
+        el.hidden = true;
+      }
+    }
+
+    function stopScanner() {
+      scannerState.active = false;
+
+      if (scannerState.rafId) {
+        window.cancelAnimationFrame(scannerState.rafId);
+        scannerState.rafId = 0;
+      }
+
+      if (scannerState.stream) {
+        scannerState.stream.getTracks().forEach((track) => {
+          try { track.stop(); } catch (_) { /* ignore */ }
+        });
+        scannerState.stream = null;
+      }
+
+      if (scannerState.video) {
+        try { scannerState.video.srcObject = null; } catch (_) { /* ignore */ }
+      }
+    }
+
+    async function openScanner() {
+      const modal = $('scanner-modal');
+      if (!modal) return;
+
+      showScannerError('');
+
+      if (!window.isSecureContext) {
+        showScannerError('Camera access requires HTTPS. Please open this page over a secure connection.');
+        if (!modal.open) modal.showModal();
+        return;
+      }
+
+      if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+        showScannerError('This browser does not support camera access.');
+        if (!modal.open) modal.showModal();
+        return;
+      }
+
+      if (typeof window.jsQR !== 'function') {
+        showScannerError('QR scanner library failed to load. Please refresh the page.');
+        if (!modal.open) modal.showModal();
+        return;
+      }
+
+      scannerState.video = $('scanner-video');
+
+      if (!scannerState.canvas) {
+        scannerState.canvas = document.createElement('canvas');
+        scannerState.ctx = scannerState.canvas.getContext('2d', { willReadFrequently: true });
+      }
+
+      if (!modal.open) modal.showModal();
+
+      try {
+        const stream = await navigator.mediaDevices.getUserMedia({
+          video: {
+            facingMode: { ideal: 'environment' },
+            width: { ideal: 1280 },
+            height: { ideal: 720 }
+          },
+          audio: false
+        });
+
+        scannerState.stream = stream;
+        scannerState.video.srcObject = stream;
+        scannerState.video.setAttribute('playsinline', 'true');
+        await scannerState.video.play();
+
+        scannerState.active = true;
+        scanLoop();
+      } catch (error) {
+        console.error('Camera error:', error);
+        let message = 'Could not start the camera.';
+
+        if (error && (error.name === 'NotAllowedError' || error.name === 'SecurityError')) {
+          message = 'Camera permission was denied. Allow camera access and try again.';
+        } else if (error && error.name === 'NotFoundError') {
+          message = 'No camera was found on this device.';
+        } else if (error && error.name === 'NotReadableError') {
+          message = 'The camera is already in use by another app.';
+        }
+
+        showScannerError(message);
+        stopScanner();
+      }
+    }
+
+    function closeScanner() {
+      stopScanner();
+      const modal = $('scanner-modal');
+      if (modal && modal.open) modal.close();
+    }
+
+    function scanLoop() {
+      if (!scannerState.active) return;
+
+      const video = scannerState.video;
+      const canvas = scannerState.canvas;
+      const ctx = scannerState.ctx;
+
+      if (!video || !canvas || !ctx || video.readyState < 2) {
+        scannerState.rafId = window.requestAnimationFrame(scanLoop);
+        return;
+      }
+
+      const width = video.videoWidth;
+      const height = video.videoHeight;
+
+      if (width === 0 || height === 0) {
+        scannerState.rafId = window.requestAnimationFrame(scanLoop);
+        return;
+      }
+
+      const maxDim = 720;
+      const scale = Math.min(1, maxDim / Math.max(width, height));
+      const cw = Math.round(width * scale);
+      const ch = Math.round(height * scale);
+
+      if (canvas.width !== cw || canvas.height !== ch) {
+        canvas.width = cw;
+        canvas.height = ch;
+      }
+
+      ctx.drawImage(video, 0, 0, cw, ch);
+
+      let result = null;
+      try {
+        const imageData = ctx.getImageData(0, 0, cw, ch);
+        result = window.jsQR(imageData.data, cw, ch, { inversionAttempts: 'dontInvert' });
+      } catch (_) {
+        result = null;
+      }
+
+      if (result && result.data) {
+        handleScannedText(result.data);
+        return;
+      }
+
+      scannerState.rafId = window.requestAnimationFrame(scanLoop);
+    }
+
+    function extractRoomCode(text) {
+      if (!text) return null;
+
+      try {
+        const url = new URL(text);
+        const hashMatch = /receive=(\d{6})/.exec(url.hash || '');
+        if (hashMatch) return hashMatch[1];
+        const param = url.searchParams.get('receive');
+        if (param && /^\d{6}$/.test(param)) return param;
+      } catch (_) { /* not a URL */ }
+
+      const bare = String(text).trim();
+      return /^\d{6}$/.test(bare) ? bare : null;
+    }
+
+    function handleScannedText(text) {
+      const code = extractRoomCode(text);
+
+      if (!code) {
+        showScannerError('That QR code does not contain a valid DropLink room code.');
+
+        scannerState.active = false;
+        if (scannerState.rafId) {
+          window.cancelAnimationFrame(scannerState.rafId);
+          scannerState.rafId = 0;
+        }
+        window.setTimeout(() => {
+          if ($('scanner-modal') && $('scanner-modal').open) {
+            if (scannerState.rafId) {
+              window.cancelAnimationFrame(scannerState.rafId);
+              scannerState.rafId = 0;
+            }
+            scannerState.active = true;
+            scanLoop();
+          }
+        }, 1600);
+        return;
+      }
+
+      stopScanner();
+      const modal = $('scanner-modal');
+      if (modal && modal.open) modal.close();
+
+      setCodeInputs(code);
+      toast(`QR code scanned — connecting to room ${code}.`, 'success');
+
+      joinRoom();
+    }
+
+    function bindScanner() {
+      const openBtn = $('scan-qr-btn');
+      if (openBtn) openBtn.addEventListener('click', openScanner);
+
+      const closeBtn = $('scanner-close');
+      if (closeBtn) closeBtn.addEventListener('click', closeScanner);
+
+      const modal = $('scanner-modal');
+      if (modal) {
+        modal.addEventListener('click', (event) => {
+          if (event.target === modal) closeScanner();
+        });
+        modal.addEventListener('close', stopScanner);
+        modal.addEventListener('cancel', () => stopScanner());
+      }
+
+      document.addEventListener('visibilitychange', () => {
+        if (document.hidden && scannerState.active) stopScanner();
+      });
+    }
+
+
     /* ==================================================================
        25. Hash routing (#receive=123456)
        ================================================================== */
@@ -3114,7 +4083,7 @@ function showCompletionModal(direction, count, totalBytes) {
         /* ignore */
       }
 
-      window.setTimeout(() => joinRoom(), 120);
+      
     }
 
     /* ==================================================================
@@ -3126,9 +4095,41 @@ function showCompletionModal(direction, count, totalBytes) {
       $('history-nav').addEventListener('click', () => showView('history'));
       $('send-nav').addEventListener('click', () => showView('send'));
       $('receive-nav').addEventListener('click', () => showView('receive'));
-      $$('.back-btn').forEach((button) => {
-        button.addEventListener('click', () => showView('dashboard'));
-      });
+// Back buttons for Send and Receive views
+$$('#view-send .back-btn, #view-receive .back-btn').forEach((button) => {
+  button.addEventListener('click', () => {
+
+const hasSessionData =
+  state.active ||
+  state.files.length > 0 ||
+  state.receivedList.length > 0 ||
+  codeInputs.some(input => input.value.trim() !== '');
+
+    // Nothing to clear, so return home directly.
+    if (!hasSessionData) {
+      showView('dashboard');
+      return;
+    }
+
+    // Show confirmation only when session data exists.
+    openConfirmModal({
+      title: 'Leave this session?',
+      description: 'Are you sure you want to go back to the home page? Your selected and received file lists and current transfer session will be cleared.',
+      confirmText: 'Continue',
+      cancelText: 'Stay here',
+      onConfirm: clearSessionAndGoHome
+    });
+  });
+});
+
+// History back button should simply return home.
+const historyBackButton = $('#view-history .back-btn');
+
+if (historyBackButton) {
+  historyBackButton.addEventListener('click', () => {
+    showView('dashboard');
+  });
+}
 
       // Send view: file picking --------------------------------------
       const dropZone = $('drop-zone');
@@ -3218,25 +4219,7 @@ $('clear-files').addEventListener('click', () => {
       // Receive view -------------------------------------------------
 $('join-form').addEventListener('submit', (event) => {
   event.preventDefault();
-
-  const code = readCodeInputs();
-
-  if (!/^\d{6}$/.test(code)) {
-    toast('Enter the full six-digit code.', 'error');
-    focusFirstEmptyDigit();
-    return;
-  }
-
-  if (state.active && state.role === 'receiver' && state.room === code) {
-    return;
-  }
-
-  openConfirmModal({
-    title: 'Join connection room?',
-    description: `Are you sure you want to connect using room code ${code}?`,
-    confirmText: 'Join room',
-    onConfirm: joinRoom
-  });
+  joinRoom();
 });
       $('cancel-receive').addEventListener('click', openCancelModal);
       $('retry-receive').addEventListener('click', () => joinRoom());
@@ -3244,6 +4227,16 @@ $('join-form').addEventListener('submit', (event) => {
       // Cancel confirmation modal --------------------------------
 
 $('keep-transfer').addEventListener('click', closeCancelModal);
+
+$('accept-connection').addEventListener(
+  'click',
+  acceptConnectionRequest
+);
+
+$('reject-connection').addEventListener(
+  'click',
+  rejectConnectionRequest
+);
 
 $('complete-done').addEventListener('click', async () => {
   const currentBus = state.bus;
@@ -3346,6 +4339,9 @@ $('clear-history').addEventListener('click', () => {
     }
   });
 });
+
+      // QR scanner ---------------------------------------------------
+      bindScanner();
 
       // Routing ------------------------------------------------------
       window.addEventListener('hashchange', handleHash);
