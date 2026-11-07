@@ -715,6 +715,88 @@
   box-shadow: inset 3px 0 0 #b9e976;
 }
 
+/* Receiver device identity animation */
+.receiver-device-card {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-top: 12px;
+  padding: 13px 15px;
+  border-radius: 14px;
+  background: rgba(139, 92, 246, 0.09);
+  border: 1px solid rgba(139, 92, 246, 0.25);
+  opacity: 0;
+  transform: translateY(12px) scale(0.98);
+  animation: deviceCardEnter 0.55s cubic-bezier(.2,.8,.2,1) forwards;
+}
+
+.receiver-device-card[hidden] {
+  display: none;
+}
+
+@keyframes deviceCardEnter {
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+.receiver-device-icon {
+  width: 38px;
+  height: 38px;
+  display: grid;
+  place-items: center;
+  border-radius: 11px;
+  background: rgba(139, 92, 246, 0.16);
+  font-size: 19px;
+}
+
+.receiver-device-info {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
+  flex: 1;
+}
+
+.receiver-device-caption {
+  font-size: 10px;
+  letter-spacing: 1.2px;
+  color: #a78bfa;
+  font-weight: 700;
+}
+
+.receiver-device-info strong {
+  font-size: 13px;
+  color: var(--text-primary, #fff);
+  overflow-wrap: anywhere;
+}
+
+.receiver-device-dot {
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  background: #a3e635;
+  box-shadow: 0 0 10px rgba(163, 230, 53, 0.65);
+  animation: deviceDotPulse 1.5s ease-in-out infinite;
+}
+
+@keyframes deviceDotPulse {
+  50% {
+    opacity: 0.45;
+    transform: scale(0.8);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .receiver-device-card,
+  .receiver-device-dot {
+    animation: none;
+    opacity: 1;
+    transform: none;
+  }
+}
+
 /* Smooth Resume button */
 #pause-send {
   transition:
@@ -1279,6 +1361,35 @@
         transition-duration: 0.01ms !important;
       }
     }
+
+    /* Highlight receiver device in connection request */
+.connection-request-message {
+  line-height: 1.7;
+}
+
+#connection-request-device-name {
+  display: inline-block;
+  color: #a78bfa;
+  font-weight: 800;
+  padding: 3px 9px;
+  margin-bottom: 5px;
+  border-radius: 7px;
+  background: rgba(139, 92, 246, 0.13);
+}
+
+#connection-request-device-name.is-revealing {
+  animation: deviceNameReveal 0.5s ease both;
+}
+@keyframes deviceNameReveal {
+  from {
+    opacity: 0;
+    transform: translateY(7px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
   </style>
 </head>
 
@@ -1524,22 +1635,31 @@
             <span class="label" id="code-label">Connection code</span>
             <div class="code-inputs" id="code-inputs" role="group" aria-labelledby="code-label">
               <input class="code-digit" type="text" inputmode="numeric" autocomplete="off"
-                     maxlength="1" aria-label="Digit 1">
+                     maxlength="6" aria-label="Digit 1">
               <input class="code-digit" type="text" inputmode="numeric" autocomplete="off"
-                     maxlength="1" aria-label="Digit 2">
+                     maxlength="6" aria-label="Digit 2">
               <input class="code-digit" type="text" inputmode="numeric" autocomplete="off"
-                     maxlength="1" aria-label="Digit 3">
+                     maxlength="6" aria-label="Digit 3">
               <input class="code-digit" type="text" inputmode="numeric" autocomplete="off"
-                     maxlength="1" aria-label="Digit 4">
+                     maxlength="6" aria-label="Digit 4">
               <input class="code-digit" type="text" inputmode="numeric" autocomplete="off"
-                     maxlength="1" aria-label="Digit 5">
+                     maxlength="6" aria-label="Digit 5">
               <input class="code-digit" type="text" inputmode="numeric" autocomplete="off"
-                     maxlength="1" aria-label="Digit 6">
+                     maxlength="6" aria-label="Digit 6">
             </div>
             <button type="submit" id="join-btn" class="btn btn-primary btn-block">Connect</button>
           </form>
 
           <p id="receiver-status" class="status-line" role="status"></p>
+
+<div id="receiver-device-card" class="receiver-device-card" hidden>
+  <span class="receiver-device-icon">📱</span>
+  <div class="receiver-device-info">
+    <span class="receiver-device-caption">CONNECTING FROM</span>
+    <strong id="receiver-device-name">Your device</strong>
+  </div>
+  <span class="receiver-device-dot"></span>
+</div>
 
           <!-- Progress -->
           <div id="receive-progress" hidden>
@@ -1673,9 +1793,12 @@
 
     <h2>Connection Request</h2>
 
-    <p id="connection-request-device">
-      A device wants to connect to your DropLink room.
-    </p>
+<p class="connection-request-message">
+  <strong id="connection-request-device-name">
+    Unknown device
+  </strong>
+  wants to connect to your DropLink room.
+</p>
 
     <p>Do you want to allow this device to receive your selected files?</p>
 
@@ -1904,14 +2027,43 @@ let pendingConfirmAction = null;
     /* ==================================================================
        6. View switching
        ================================================================== */
-    function showView(name) {
-      VIEW_IDS.forEach((view) => {
-        const el = $(`view-${view}`);
-        if (el) el.hidden = view !== name;
-      });
-      if (name === 'history') renderHistory();
-      window.scrollTo(0, 0);
+
+function showView(name) {
+
+// Prevent opening History when session data exists.
+if (
+  name === 'history' &&
+  (
+    state.active ||
+    state.files.length > 0 ||
+    state.receivedList.length > 0 ||
+    codeInputs.some(input => input.value.trim() !== '')
+  )
+) {
+  openConfirmModal({
+    title: 'Leave this session?',
+    description: 'Are you sure you want to leave this session and open History? Your selected and received file lists and current transfer session will be cleared.',
+    confirmText: 'Continue',
+    cancelText: 'Stay here',
+    onConfirm: async () => {
+      await clearSessionAndGoHome();
+      showView('history');
     }
+  });
+
+  return;
+}
+
+  VIEW_IDS.forEach((view) => {
+    const el = $(`view-${view}`);
+    if (el) el.hidden = view !== name;
+  });
+
+  if (name === 'history') renderHistory();
+
+  window.scrollTo(0, 0);
+}
+
 
     /* ==================================================================
        7. Status helpers
@@ -2185,7 +2337,9 @@ if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT') {
       state.bus = createBus(room, handleSignal);
     }
 
-    function getDeviceLabel() {
+
+
+async function getDeviceLabel() {
   const ua = navigator.userAgent;
 
   let device = 'Unknown device';
@@ -2193,19 +2347,48 @@ if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT') {
 
   if (/Android/i.test(ua)) {
     device = 'Android device';
+
+    // Extract Android model from User Agent.
+    const modelMatch = ua.match(
+      /Android\s[^;]+;\s*([A-Z0-9_-]+)(?:\s+Build\/|[;)])/i
+    );
+
+    if (modelMatch && modelMatch[1]) {
+      device = modelMatch[1];
+    }
+
+    // Try Client Hints if available.
+    if (navigator.userAgentData?.getHighEntropyValues) {
+      try {
+        const info = await navigator.userAgentData.getHighEntropyValues([
+          'model'
+        ]);
+
+        if (info.model && info.model.trim()) {
+          device = info.model.trim();
+        }
+      } catch (error) {
+        console.warn('Could not retrieve device model:', error);
+      }
+    }
+
   } else if (/iPhone|iPad|iPod/i.test(ua)) {
     device = 'Apple device';
+
   } else if (/Windows/i.test(ua)) {
     device = 'Windows PC';
+
   } else if (/Macintosh|Mac OS/i.test(ua)) {
     device = 'Mac';
+
   } else if (/Linux/i.test(ua)) {
     device = 'Linux device';
   }
 
+  // Detect browser.
   if (/Edg/i.test(ua)) {
     browser = 'Microsoft Edge';
-  } else if (/Chrome/i.test(ua) && !/Edg/i.test(ua)) {
+  } else if (/Chrome/i.test(ua)) {
     browser = 'Google Chrome';
   } else if (/Firefox/i.test(ua)) {
     browser = 'Firefox';
@@ -2215,6 +2398,8 @@ if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT') {
 
   return `${device} • ${browser}`;
 }
+
+
 
 function acceptConnectionRequest() {
   if (
@@ -2420,9 +2605,30 @@ function handleConfirmAction() {
 }
 
 // Cancel transfer confirmation
-function openCancelModal() {
-  if (!state.active) return;
 
+function openCancelModal() {
+
+  // If the sender rejected the connection,
+  // allow the receiver to clear the rejected session.
+  if (!state.active) {
+
+    if (
+      state.role === 'receiver' &&
+      !$('retry-receive').hidden
+    ) {
+      openConfirmModal({
+        title: 'Cancel connection?',
+        description: 'Are you sure you want to cancel this connection and return to the home screen?',
+        confirmText: 'Yes, cancel',
+        cancelText: 'Keep connection',
+        onConfirm: clearSessionAndGoHome
+      });
+    }
+
+    return;
+  }
+
+  // Normal active transfer cancellation.
   openConfirmModal({
     title: 'Cancel transfer?',
     description: 'Are you sure you want to cancel this transfer? Your current connection will be closed.',
@@ -2431,6 +2637,7 @@ function openCancelModal() {
     onConfirm: confirmCancelTransfer
   });
 }
+
 
 async function confirmCancelTransfer() {
   if (!state.active) return;
@@ -2586,6 +2793,10 @@ $('receive-bar').classList.remove('is-paused', 'is-resumed');
 $('sender-status').classList.remove('is-paused', 'is-resumed');
 $('receiver-status').classList.remove('is-paused', 'is-resumed');
 
+// Clear receiver device information from the previous session.
+$('receiver-device-card').hidden = true;
+$('receiver-device-name').textContent = 'Your device';
+
 $('pause-send').classList.remove('is-paused');
       $('send-current').textContent = '';
       $('receive-current').textContent = '';
@@ -2633,6 +2844,7 @@ async function clearSessionAndGoHome() {
   codeInputs.forEach((input) => {
     input.value = '';
   });
+
 
   // Clear room and QR information.
   $('room-wrap').hidden = true;
@@ -3306,8 +3518,14 @@ case 'connection_request': {
   state.pendingRequestId = data.requestId;
   state.pendingReceiverId = data.from;
 
-  $('connection-request-device').textContent =
-    `${data.deviceName || 'Unknown device'} wants to connect to your DropLink room.`;
+const deviceNameElement = $('connection-request-device-name');
+
+deviceNameElement.classList.remove('is-revealing');
+deviceNameElement.textContent = data.deviceName || 'Unknown device';
+
+// Restart the reveal animation for every new request.
+void deviceNameElement.offsetWidth;
+deviceNameElement.classList.add('is-revealing');
 
   $('connection-request-modal').showModal();
 
@@ -4032,7 +4250,7 @@ scheduleProgress('receive');
       if (target) target.focus();
     }
 
-    function joinRoom() {
+    async function joinRoom() {
       const code = readCodeInputs();
 
       if (!/^\d{6}$/.test(code)) {
@@ -4066,14 +4284,29 @@ state.connectionRequestId =
 
 $('receiver-actions').hidden = false;
 
+// Get the receiver's device information.
+const receiverDeviceName = await getDeviceLabel();
+
+// Show device information with animation.
+const deviceCard = $('receiver-device-card');
+const deviceNameElement = $('receiver-device-name');
+
+deviceNameElement.textContent = receiverDeviceName;
+
+// Restart animation if the card was previously displayed.
+deviceCard.hidden = true;
+void deviceCard.offsetWidth;
+deviceCard.hidden = false;
+
 setStatus('Waiting for the sender to approve your connection…');
 
 smoothScrollTo($('receiver-status'));
 
+// Send device information to the sender.
 signal({
   type: 'connection_request',
   requestId: state.connectionRequestId,
-  deviceName: getDeviceLabel()
+  deviceName: receiverDeviceName
 });
 
       window.clearTimeout(joinTimer);
@@ -4089,17 +4322,24 @@ signal({
        ================================================================== */
     const codeInputs = $$('.code-digit');
 
-    function distributeDigits(digits, startIndex) {
-      let cursor = startIndex;
-      for (const char of digits) {
-        if (cursor >= codeInputs.length) break;
-        codeInputs[cursor].value = char;
-        cursor += 1;
-      }
-      const nextIndex = Math.min(cursor, codeInputs.length - 1);
-      if (codeInputs[nextIndex]) codeInputs[nextIndex].focus();
-      
-    }
+function distributeDigits(digits, startIndex = 0) {
+  const cleanDigits = String(digits)
+    .replace(/\D/g, '')
+    .slice(0, 6);
+
+  // Fill all six boxes from the beginning.
+  setCodeInputs(cleanDigits);
+
+  // Focus the last filled box.
+  const focusIndex = Math.min(
+    Math.max(cleanDigits.length - 1, 0),
+    codeInputs.length - 1
+  );
+
+  if (codeInputs[focusIndex]) {
+    codeInputs[focusIndex].focus();
+  }
+}
 
 function maybeAutoJoin() {
   // Automatic connection disabled.
